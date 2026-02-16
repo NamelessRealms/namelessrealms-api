@@ -47,9 +47,9 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_STORAGE_IP }}/${{ env.IMAGE }}
 
-      - name: Invoke deployment hook
-        uses: distributhor/workflow-webhook@v2
-        env:
-          webhook_url: ${{ secrets.WEBHOOK_URL }}/namelessrealms-api-build-webhook
-          webhook_secret: ${{ secrets.WEBHOOK_SECRET }}
-          webhook_auth: ${{ secrets.WEBHOOK_USERNAME }}:${{ secrets.WEBHOOK_PASSWORD }}
+      # - name: Invoke deployment hook
+      #   uses: distributhor/workflow-webhook@v2
+      #   env:
+      #     webhook_url: ${{ secrets.WEBHOOK_URL }}/namelessrealms-api-build-webhook
+      #     webhook_secret: ${{ secrets.WEBHOOK_SECRET }}
+      #     webhook_auth: ${{ secrets.WEBHOOK_USERNAME }}:${{ secrets.WEBHOOK_PASSWORD }}
