@@ -49,7 +49,7 @@ export default class SponsorController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const uuid = request.params.uuid;
+    const uuid = request.params.uuid as string;
     const bodyData: { money: number } = request.body;
 
     // 確保客戶端必要的參數
@@ -76,7 +76,7 @@ export default class SponsorController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const uuid = request.params.uuid;
+    const uuid = request.params.uuid as string;
     await this._sponsorService.deleteSponsorUser(uuid);
 
     response.status(204).send();
@@ -86,7 +86,7 @@ export default class SponsorController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const uuid = request.params.uuid;
+    const uuid = request.params.uuid as string;
     const sponsorUserData = await this._sponsorService.getSponsorUser(uuid);
 
     if (sponsorUserData !== undefined) {

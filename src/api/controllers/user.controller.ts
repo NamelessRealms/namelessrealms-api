@@ -51,7 +51,7 @@ export default class UserController {
     response: Response,
   ): Promise<void> {
     // minecraft player uuid or discord user id
-    const id = request.params.id;
+    const id = request.params.id as string;
 
     const userLinkData = await this._userService.getUserLink(id);
 
@@ -66,7 +66,7 @@ export default class UserController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const minecraftUUID = request.params.minecraftUUID;
+    const minecraftUUID = request.params.minecraftUUID as string;
 
     const playerRoleData = await this._userService.getPlayerRole(minecraftUUID);
 
@@ -95,7 +95,7 @@ export default class UserController {
     response: Response,
   ): Promise<void> {
     // github user id
-    const id = request.params.id;
+    const id = request.params.id as string;
 
     const panelUser = await this._userService.getPanelUser(id);
 

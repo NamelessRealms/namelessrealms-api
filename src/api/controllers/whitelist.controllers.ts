@@ -70,7 +70,7 @@ export default class WhitelistController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const discordId = request.params.discordId;
+    const discordId = request.params.discordId as string;
     const awaitVerifyData =
       await this._whitelistService.getAwaitVerify(discordId);
 
@@ -85,7 +85,7 @@ export default class WhitelistController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const discordId = request.params.discordId;
+    const discordId = request.params.discordId as string;
     await this._whitelistService.deleteAwaitVerify(discordId);
 
     response.status(204).send();
@@ -171,7 +171,7 @@ export default class WhitelistController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const discordUserId = request.params.discordUserId;
+    const discordUserId = request.params.discordUserId as string;
     const manualVerifyData =
       await this._whitelistService.getManualVerify(discordUserId);
 
@@ -186,8 +186,8 @@ export default class WhitelistController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const channelId = request.params.channelId;
-    const messageId = request.params.messageId;
+    const channelId = request.params.channelId as string;
+    const messageId = request.params.messageId as string;
 
     const manualVerifyData = await this._whitelistService.getManualVerifyCIdMId(
       channelId,
@@ -205,8 +205,8 @@ export default class WhitelistController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const channelId = request.params.channelId;
-    const messageId = request.params.messageId;
+    const channelId = request.params.channelId as string;
+    const messageId = request.params.messageId as string;
 
     await this._whitelistService.deleteManualVerify(channelId, messageId);
 
@@ -273,7 +273,7 @@ export default class WhitelistController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const minecraftUUID = request.params.minecraftUUID;
+    const minecraftUUID = request.params.minecraftUUID as string;
     const serverWhitelistData =
       await this._whitelistService.getServerWhitelist(minecraftUUID);
 
@@ -294,8 +294,8 @@ export default class WhitelistController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const minecraftUUID = request.params.minecraftUUID;
-    const serverId = request.params.serverId;
+    const minecraftUUID = request.params.minecraftUUID as string;
+    const serverId = request.params.serverId as string;
 
     const serverWhitelistData =
       await this._whitelistService.getServerWhitelistServerId(
@@ -314,7 +314,7 @@ export default class WhitelistController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const minecraftUUID = request.params.minecraftUUID;
+    const minecraftUUID = request.params.minecraftUUID as string;
     await this._whitelistService.deleteServerWhitelist(minecraftUUID);
 
     response.status(204).send();
@@ -370,7 +370,7 @@ export default class WhitelistController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const discordUserId = request.params.discordUserId;
+    const discordUserId = request.params.discordUserId as string;
 
     await this._whitelistService.deleteTpmeVerifyWhitelist(discordUserId);
 

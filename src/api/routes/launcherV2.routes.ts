@@ -1,5 +1,5 @@
 import { Application, Request, Response } from "express";
-import * as multer from "multer";
+import multer from "multer";
 import LauncherController from "../controllers/launcher.controller";
 
 import IRoutes from "./IRoutes";
@@ -28,7 +28,7 @@ export default class LauncherV2Router extends IRoutes {
       );
 
     this._routers.route("/webhooks/discord").post(
-      multer().any(),
+      multer().any() as any,
       asyncHandler((req: Request, res: Response) =>
         this._launcherController.postDiscordWebhooks(req, res),
       ),

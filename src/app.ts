@@ -1,13 +1,13 @@
-import * as express from "express";
-import * as path from "path";
+import express from "express";
+import path from "path";
 import { config } from "./config/config.service";
-import * as morgan from "morgan";
-import * as helmet from "helmet";
-import * as cookieParser from "cookie-parser";
-import * as fs from "fs-extra";
-import * as http from "http";
-import * as https from "https";
-import * as cors from "cors";
+const morgan = require("morgan");
+import helmet from "helmet";
+const cookieParser = require("cookie-parser");
+import fs from "fs-extra";
+import http from "http";
+import https from "https";
+const cors = require("cors");
 import * as socketIo from "socket.io";
 // import * as session from "express-session";
 

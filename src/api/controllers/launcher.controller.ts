@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as FormData from "form-data";
+import FormData from "form-data";
 import { config } from "../../config/config.service";
 
 import LauncherService from "../services/launcher/launcher.service";

@@ -7,8 +7,8 @@ export default class ModsController {
   private _modsService = new ModsService();
 
   public async getMod(request: Request, response: Response): Promise<void> {
-    const projectId = request.params.projectId;
-    const fileId = request.params.fileId;
+    const projectId = request.params.projectId as string;
+    const fileId = request.params.fileId as string;
 
     try {
       const mod = await this._modsService.getMod(projectId, fileId);

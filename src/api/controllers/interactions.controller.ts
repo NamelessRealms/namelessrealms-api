@@ -8,8 +8,8 @@ export default class InteractionsController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const appId = request.params.appId;
-    const ip = request.ip;
+    const appId = request.params.appId as string;
+    const ip = request.ip as string;
 
     this._interactionsService.addInteractionCallbackPing(appId, ip);
 
@@ -22,8 +22,8 @@ export default class InteractionsController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const appId = request.params.appId;
-    const ip = request.ip;
+    const appId = request.params.appId as string;
+    const ip = request.ip as string;
 
     const isAdd = this._interactionsService.addInteractionCallback(appId, ip);
 
