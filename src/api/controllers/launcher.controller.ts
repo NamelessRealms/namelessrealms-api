@@ -8,6 +8,17 @@ import { AppError } from "../utils/response/AppError";
 export default class LauncherController {
   private _launcherService = new LauncherService();
 
+  /**
+   * @openapi
+   * /launcher/assets:
+   *   get:
+   *     tags:
+   *       - Launcher
+   *     summary: 取得 Launcher 資產設定 (V1)
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getLauncherAssets(
     request: Request,
     response: Response,
@@ -17,6 +28,17 @@ export default class LauncherController {
     response.status(200).json(launcherAssetsData);
   }
 
+  /**
+   * @openapi
+   * /launcher/v2/assets:
+   *   get:
+   *     tags:
+   *       - Launcher
+   *     summary: 取得 Launcher 資產設定 (V2)
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getLauncherAssetsV2(
     request: Request,
     response: Response,
@@ -27,6 +49,17 @@ export default class LauncherController {
     response.status(200).json(launcherAssetsV2Data);
   }
 
+  /**
+   * @openapi
+   * /launcher/page:
+   *   get:
+   *     tags:
+   *       - Launcher
+   *     summary: 取得 Launcher 頁面設定
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getLauncherPage(
     request: Request,
     response: Response,
@@ -133,6 +166,29 @@ export default class LauncherController {
     response.redirect(nupkgData.browser_download_url);
   }
 
+  /**
+   * @openapi
+   * /launcher/v2/webhooks/discord:
+   *   post:
+   *     tags:
+   *       - Launcher
+   *     summary: 轉發至 Discord Webhook
+   *     description: 支援 multipart/form-data 格式，可上傳檔案與 payload_json。
+   *     requestBody:
+   *       content:
+   *         multipart/form-data:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               payload_json:
+   *                 type: string
+   *               file:
+   *                 type: string
+   *                 format: binary
+   *     responses:
+   *       200:
+   *         description: 傳送成功
+   */
   public async postDiscordWebhooks(
     request: Request,
     response: Response,

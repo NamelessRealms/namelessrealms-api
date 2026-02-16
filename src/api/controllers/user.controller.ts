@@ -8,6 +8,19 @@ import { AppError } from "../utils/response/AppError";
 export default class UserController {
   private _userService = new UserService();
 
+  /**
+   * @openapi
+   * /user/userLink:
+   *   get:
+   *     tags:
+   *       - User
+   *     summary: 取得所有使用者連結資訊
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: 成功取得資料
+   */
   public async getAllUserLink(
     request: Request,
     response: Response,
@@ -21,6 +34,30 @@ export default class UserController {
     }
   }
 
+  /**
+   * @openapi
+   * /user/userLink:
+   *   post:
+   *     tags:
+   *       - User
+   *     summary: 建立使用者連結
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               minecraft_uuid:
+   *                 type: string
+   *               discord_id:
+   *                 type: string
+   *     responses:
+   *       201:
+   *         description: 建立成功
+   */
   public async createUserLink(
     request: Request,
     response: Response,
@@ -46,6 +83,26 @@ export default class UserController {
     }
   }
 
+  /**
+   * @openapi
+   * /user/userLink/{id}:
+   *   get:
+   *     tags:
+   *       - User
+   *     summary: 取得指定使用者連結資訊
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Minecraft UUID 或 Discord ID
+   *     responses:
+   *       200:
+   *         description: 成功
+   *       204:
+   *         description: 找不到資料
+   */
   public async getUserLink(
     request: Request,
     response: Response,
@@ -62,6 +119,23 @@ export default class UserController {
     }
   }
 
+  /**
+   * @openapi
+   * /user/playerRole/{minecraftUUID}:
+   *   get:
+   *     tags:
+   *       - User
+   *     summary: 取得玩家權限組資訊
+   *     parameters:
+   *       - in: path
+   *         name: minecraftUUID
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getPlayerRole(
     request: Request,
     response: Response,
@@ -77,6 +151,17 @@ export default class UserController {
     }
   }
 
+  /**
+   * @openapi
+   * /user/dashboard:
+   *   get:
+   *     tags:
+   *       - User
+   *     summary: 取得後台使用者列表
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getPanelUsers(
     request: Request,
     response: Response,
@@ -90,6 +175,23 @@ export default class UserController {
     }
   }
 
+  /**
+   * @openapi
+   * /user/dashboard/{id}:
+   *   get:
+   *     tags:
+   *       - User
+   *     summary: 取得指定後台使用者資訊
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getPanelUser(
     request: Request,
     response: Response,

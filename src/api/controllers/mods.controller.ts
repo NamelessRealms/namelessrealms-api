@@ -6,10 +6,31 @@ import { AppError } from "../utils/response/AppError";
 export default class ModsController {
   private _modsService = new ModsService();
 
+  /**
+   * @openapi
+   * /mods/{projectId}/file/{fileId}:
+   *   get:
+   *     tags:
+   *       - Mods
+   *     summary: 取得單一 Mod 檔案資訊
+   *     parameters:
+   *       - in: path
+   *         name: projectId
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: fileId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getMod(request: Request, response: Response): Promise<void> {
     const projectId = request.params.projectId as string;
     const fileId = request.params.fileId as string;
-
     try {
       const mod = await this._modsService.getMod(projectId, fileId);
       response.status(200).json(mod);
@@ -21,9 +42,30 @@ export default class ModsController {
     }
   }
 
+  /**
+   * @openapi
+   * /mods:
+   *   post:
+   *     tags:
+   *       - Mods
+   *     summary: 批量取得 Mods 資訊
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               modIds:
+   *                 type: array
+   *                 items:
+   *                   type: string
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getMods(request: Request, response: Response): Promise<void> {
     const bodyData: { modIds: Array<string> } = request.body;
-
     // 確保客戶端必要的參數
     if (!VerifyRequestParameter.verify(bodyData, ["modIds"])) {
       throw new AppError("通訊協定錯誤，遺漏必要的參數。", 400);
@@ -41,6 +83,28 @@ export default class ModsController {
     }
   }
 
+  /**
+   * @openapi
+   * /mods/files:
+   *   post:
+   *     tags:
+   *       - Mods
+   *     summary: 批量取得 Mod 檔案資訊
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               fileIds:
+   *                 type: array
+   *                 items:
+   *                   type: string
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getModFiles(
     request: Request,
     response: Response,

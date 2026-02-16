@@ -12,6 +12,32 @@ import { AppError } from "../utils/response/AppError";
 export default class WhitelistController {
   private readonly _whitelistService = new WhitelistService();
 
+  /**
+   * @openapi
+   * /whitelist/awaitVerify:
+   *   post:
+   *     tags:
+   *       - Whitelist
+   *     summary: 建立待驗證清單
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               minecraft_id:
+   *                 type: string
+   *               discord_id:
+   *                 type: string
+   *               server_id:
+   *                 type: string
+   *     responses:
+   *       201:
+   *         description: 建立成功
+   */
   public async createAwaitVerify(
     request: Request,
     response: Response,
@@ -66,6 +92,23 @@ export default class WhitelistController {
     return VerifyRequest.verifyParameter(requestBody, verifyParameterMethod);
   }
 
+  /**
+   * @openapi
+   * /whitelist/awaitVerify/{discordId}:
+   *   get:
+   *     tags:
+   *       - Whitelist
+   *     summary: 取得特定 Discord ID 的待驗證資訊
+   *     parameters:
+   *       - in: path
+   *         name: discordId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getAwaitVerify(
     request: Request,
     response: Response,
@@ -81,6 +124,25 @@ export default class WhitelistController {
     }
   }
 
+  /**
+   * @openapi
+   * /whitelist/awaitVerify/{discordId}:
+   *   delete:
+   *     tags:
+   *       - Whitelist
+   *     summary: 刪除待驗證資訊
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: discordId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       204:
+   *         description: 刪除成功
+   */
   public async deleteAwaitVerify(
     request: Request,
     response: Response,
@@ -91,6 +153,17 @@ export default class WhitelistController {
     response.status(204).send();
   }
 
+  /**
+   * @openapi
+   * /whitelist/manualVerify:
+   *   get:
+   *     tags:
+   *       - Whitelist
+   *     summary: 取得所有人工驗證列表
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getAllManualVerify(
     request: Request,
     response: Response,
@@ -105,6 +178,30 @@ export default class WhitelistController {
     }
   }
 
+  /**
+   * @openapi
+   * /whitelist/manualVerify:
+   *   post:
+   *     tags:
+   *       - Whitelist
+   *     summary: 建立人工驗證紀錄
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               minecraft_uuid:
+   *                 type: string
+   *               discord_user_id:
+   *                 type: string
+   *     responses:
+   *       201:
+   *         description: 建立成功
+   */
   public async createManualVerify(
     request: Request,
     response: Response,
@@ -213,6 +310,17 @@ export default class WhitelistController {
     response.status(204).send();
   }
 
+  /**
+   * @openapi
+   * /whitelist/serverWhitelist:
+   *   get:
+   *     tags:
+   *       - Whitelist
+   *     summary: 取得所有伺服器白名單
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getAllServerWhitelist(
     request: Request,
     response: Response,
@@ -227,6 +335,30 @@ export default class WhitelistController {
     }
   }
 
+  /**
+   * @openapi
+   * /whitelist/serverWhitelist:
+   *   post:
+   *     tags:
+   *       - Whitelist
+   *     summary: 新增伺服器白名單
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               minecraft_uuid:
+   *                 type: string
+   *               server_id:
+   *                 type: string
+   *     responses:
+   *       201:
+   *         description: 建立成功
+   */
   public async createServerWhitelist(
     request: Request,
     response: Response,

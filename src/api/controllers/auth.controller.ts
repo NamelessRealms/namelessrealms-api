@@ -8,6 +8,77 @@ import { AppError } from "../utils/response/AppError";
 export default class AuthController {
   private _authService = new AuthService();
 
+  /**
+   * @openapi
+   * /oauth2/token:
+   *   post:
+   *     tags:
+   *       - Authentication
+   *     summary: 用戶登入取得 Token
+   *     description: 支援 OAuth 2.0 Password Grant 流程。驗證成功後將回傳 Access Token 與用戶基本資訊。
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - grant_type
+   *               - username
+   *               - password
+   *             properties:
+   *               grant_type:
+   *                 type: string
+   *                 example: password
+   *                 description: 授權類型，固定為 password
+   *               username:
+   *                 type: string
+   *                 example: quasi
+   *                 description: 帳號
+   *               password:
+   *                 type: string
+   *                 example: "123456"
+   *                 description: 密碼
+   *     responses:
+   *       200:
+   *         description: 登入成功
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 access_token:
+   *                   type: string
+   *                 token_type:
+   *                   type: string
+   *                   example: bearer
+   *                 expires_in:
+   *                   type: number
+   *                 scope:
+   *                   type: array
+   *                   items:
+   *                     type: string
+   *                 info:
+   *                   type: object
+   *                   properties:
+   *                     username:
+   *                       type: string
+   *       400:
+   *         description: 參數錯誤或驗證失敗
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: false
+   *                 error:
+   *                   type: string
+   *                   example: 通訊協定錯誤，遺漏必要的參數。
+   *       401:
+   *         description: 認證失敗
+   */
   public async login(request: Request, response: Response) {
     const bodyData: IOAuth2 = request.body;
 

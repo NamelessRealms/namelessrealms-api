@@ -4,6 +4,23 @@ import InteractionsService from "../services/Interactions/Interactions.service";
 export default class InteractionsController {
   private _interactionsService = new InteractionsService();
 
+  /**
+   * @openapi
+   * /interactions/{appId}/callback:
+   *   post:
+   *     tags:
+   *       - Interactions
+   *     summary: 建立互動回呼 (Ping)
+   *     parameters:
+   *       - in: path
+   *         name: appId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async createInteraction(
     request: Request,
     response: Response,
@@ -18,6 +35,23 @@ export default class InteractionsController {
     });
   }
 
+  /**
+   * @openapi
+   * /interactions/{appId}/callback/ping:
+   *   post:
+   *     tags:
+   *       - Interactions
+   *     summary: 互動回呼存活檢查
+   *     parameters:
+   *       - in: path
+   *         name: appId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       201:
+   *         description: 建立成功
+   */
   public async pingInteraction(
     request: Request,
     response: Response,

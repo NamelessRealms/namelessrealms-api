@@ -35,6 +35,8 @@ import SocketRouter from "./api/routes/socket.routes";
 import AuthJwtVerify from "./api/middlewares/authJwtVerify";
 import SocketIo from "./socket/SocketIo";
 import { errorMiddleware } from "./api/middlewares/error.middleware";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger";
 
 export default class App {
   private _app: express.Application;
@@ -92,6 +94,13 @@ export default class App {
     if (config.isDevelopment) {
       this._app.use(cors());
     }
+
+    // Swagger UI 路由
+    this._app.use(
+      "/api-docs",
+      swaggerUi.serve as any,
+      swaggerUi.setup(swaggerSpec) as any,
+    );
 
     this._app.use(helmet());
     this._app.use(morgan(config.isDevelopment ? "dev" : this._morganFormat));

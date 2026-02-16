@@ -8,6 +8,17 @@ import { AppError } from "../utils/response/AppError";
 export default class SponsorController {
   private _sponsorService = new SponsorService();
 
+  /**
+   * @openapi
+   * /sponsor/user:
+   *   get:
+   *     tags:
+   *       - Sponsor
+   *     summary: 取得所有贊助者列表
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getAllSponsorUser(
     request: Request,
     response: Response,
@@ -21,6 +32,33 @@ export default class SponsorController {
     }
   }
 
+  /**
+   * @openapi
+   * /sponsor/user:
+   *   post:
+   *     tags:
+   *       - Sponsor
+   *     summary: 新增贊助紀錄
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - minecraft_uuid
+   *               - money
+   *             properties:
+   *               minecraft_uuid:
+   *                 type: string
+   *               money:
+   *                 type: number
+   *     responses:
+   *       201:
+   *         description: 建立成功
+   */
   public async createSponsorUser(
     request: Request,
     response: Response,
@@ -45,6 +83,34 @@ export default class SponsorController {
     }
   }
 
+  /**
+   * @openapi
+   * /sponsor/user/{uuid}:
+   *   patch:
+   *     tags:
+   *       - Sponsor
+   *     summary: 修改贊助金額
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: uuid
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               money:
+   *                 type: number
+   *     responses:
+   *       201:
+   *         description: 修改成功
+   */
   public async patchSponsorUser(
     request: Request,
     response: Response,
@@ -72,6 +138,25 @@ export default class SponsorController {
     }
   }
 
+  /**
+   * @openapi
+   * /sponsor/user/{uuid}:
+   *   delete:
+   *     tags:
+   *       - Sponsor
+   *     summary: 刪除贊助紀錄
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: uuid
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       204:
+   *         description: 刪除成功
+   */
   public async deleteSponsorUser(
     request: Request,
     response: Response,
@@ -82,6 +167,23 @@ export default class SponsorController {
     response.status(204).send();
   }
 
+  /**
+   * @openapi
+   * /sponsor/user/{uuid}:
+   *   get:
+   *     tags:
+   *       - Sponsor
+   *     summary: 取得單一贊助者資訊
+   *     parameters:
+   *       - in: path
+   *         name: uuid
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: 成功
+   */
   public async getSponsorUser(
     request: Request,
     response: Response,
