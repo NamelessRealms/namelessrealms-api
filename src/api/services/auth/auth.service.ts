@@ -1,12 +1,13 @@
 import * as crypto from "crypto";
 import * as jwt from "jsonwebtoken";
-import * as argon2 from "argon2";
+const argon2 = require("argon2");
 
 import Mysql from "../../utils/mysql";
 
 import { IUser } from "../../../interface/auth/IUser";
 import { environment } from "../../../environment/environment";
 import Logs from "../../utils/logs";
+import { config } from "../../../config/config.service";
 
 export default class AuthService {
   /**
@@ -56,7 +57,7 @@ export default class AuthService {
       // 判定為舊 MD5 格式 (32位元 hex)
       const md5Hash = crypto
         .createHash("md5")
-        .update(plainPassword + process.env.JWT_SALT)
+        .update(plainPassword + config.jwt.salt)
         .digest("hex");
       isPasswordMatch = storedPassword === md5Hash;
 
@@ -77,7 +78,7 @@ export default class AuthService {
       try {
         const newArgon2Hash = await argon2.hash(plainPassword);
         await Mysql.getPool().query(
-          "UPDATE users SET password = ? WHERE unique = ?",
+          "UPDATE users SET password = ? WHERE `unique` = ?",
           [newArgon2Hash, user.unique],
         );
         Logs.info(
@@ -99,7 +100,7 @@ export default class AuthService {
       role: user.roles,
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET as string, {
+    const token = jwt.sign(payload, config.jwt.secret, {
       algorithm: "HS256",
       expiresIn: `${environment.jwt.increaseTime}ms`,
     });

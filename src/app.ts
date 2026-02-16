@@ -1,5 +1,6 @@
 import * as express from "express";
 import * as path from "path";
+import { config } from "./config/config.service";
 import * as morgan from "morgan";
 import * as helmet from "helmet";
 import * as cookieParser from "cookie-parser";
@@ -60,26 +61,10 @@ export default class App {
   private _io: socketIo.Server | null = null;
 
   constructor() {
-    if (process.env.MYSQL_HOST === undefined)
-      throw new Error("Env MYSQL_HOST not null.");
-    if (process.env.MYSQL_USER === undefined)
-      throw new Error("Env MYSQL_USER not null.");
-    if (process.env.MYSQL_PASSWORD === undefined)
-      throw new Error("Env MYSQL_PASSWORD not null.");
-    if (process.env.MYSQL_DATABASE === undefined)
-      throw new Error("Env MYSQL_DATABASE not null.");
-    if (process.env.JWT_SALT === undefined)
-      throw new Error("Env JWT_SALT not null.");
-    if (process.env.JWT_SECRET === undefined)
-      throw new Error("Env JWT_SECRET not null.");
-
-    if (
-      process.env.SSL_KEY_PATH !== undefined &&
-      process.env.SSL_CSR_PATH !== undefined
-    ) {
-      this._privateKey = fs.readFileSync(process.env.SSL_KEY_PATH, "utf8");
-      this._certificate = fs.readFileSync(process.env.SSL_CSR_PATH, "utf8");
-      // this._credentials = { key: privateKey, cert: certificate };
+    // ConfigService 會在初始化時自動驗證必要變數
+    if (config.ssl) {
+      this._privateKey = fs.readFileSync(config.ssl.keyPath, "utf8");
+      this._certificate = fs.readFileSync(config.ssl.certPath, "utf8");
     }
 
     this._app = express();
@@ -90,7 +75,7 @@ export default class App {
   }
 
   private _init(): void {
-    Logs.info(`Api Service start model: ${process.env.NODE_ENV}`);
+    Logs.info(`Api Service start model: ${config.env}`);
     Logs.info(`Api Service Version: ${environment.api_version}`);
     Mysql.connect();
     InteractionsService.initLoopPings();
@@ -104,16 +89,12 @@ export default class App {
   }
 
   private _middleware(): void {
-    if (process.env.NODE_ENV === "development") {
+    if (config.isDevelopment) {
       this._app.use(cors());
     }
 
     this._app.use(helmet());
-    this._app.use(
-      morgan(
-        process.env.NODE_ENV === "development" ? "dev" : this._morganFormat,
-      ),
-    );
+    this._app.use(morgan(config.isDevelopment ? "dev" : this._morganFormat));
     this._app.use(express.json({ limit: "10MB" }));
     // this._app.use(express.static(path.join(__dirname, "public")));
     this._app.use(express.urlencoded({ extended: true }));

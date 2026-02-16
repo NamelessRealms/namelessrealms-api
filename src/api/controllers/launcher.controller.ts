@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as FormData from "form-data";
+import { config } from "../../config/config.service";
 
 import LauncherService from "../services/launcher/launcher.service";
 import { AppError } from "../utils/response/AppError";
@@ -136,9 +137,9 @@ export default class LauncherController {
     request: Request,
     response: Response,
   ): Promise<void> {
-    const webhooksErrorUrl = process.env.WEBHOOKS_ERROR_URL;
+    const webhooksErrorUrl = config.webhooksErrorUrl;
 
-    if (webhooksErrorUrl === undefined) {
+    if (!webhooksErrorUrl) {
       throw new Error("Env WEBHOOKS_ERROR_URL not null.");
     }
 
