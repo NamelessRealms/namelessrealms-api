@@ -12,20 +12,18 @@ export default class InteractionsRouter extends IRoutes {
   }
 
   protected _loadRoutes(): void {
-    this._routers
-      .route("/:appId/callback")
-      .post(
-        asyncHandler((req: Request, res: Response) =>
-          this._interactionsController.createInteraction(req, res),
-        ),
-      );
+    this._routers.route("/:appId/callback").post(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._interactionsController.createInteraction(req, res),
+      ),
+    );
 
-    this._routers
-      .route("/:appId/callback/ping")
-      .post(
-        asyncHandler((req: Request, res: Response) =>
-          this._interactionsController.pingInteraction(req, res),
-        ),
-      );
+    this._routers.route("/:appId/callback/ping").post(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._interactionsController.pingInteraction(req, res),
+      ),
+    );
   }
 }

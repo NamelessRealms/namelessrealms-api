@@ -28,6 +28,7 @@ export default class LauncherRouter extends IRoutes {
         ),
       )
       .put(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._launcherController.putLauncherPage(req, res),
         ),

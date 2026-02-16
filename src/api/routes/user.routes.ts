@@ -15,6 +15,7 @@ export default class UserRouter extends IRoutes {
     this._routers
       .route("/userLink")
       .get(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._userController.getAllUserLink(req, res),
         ),
@@ -27,36 +28,32 @@ export default class UserRouter extends IRoutes {
       );
 
     // id: minecraft player uuid or discord user id
-    this._routers
-      .route("/userLink/:id")
-      .get(
-        asyncHandler((req: Request, res: Response) =>
-          this._userController.getUserLink(req, res),
-        ),
-      );
+    this._routers.route("/userLink/:id").get(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._userController.getUserLink(req, res),
+      ),
+    );
 
-    this._routers
-      .route("/playerRole/:minecraftUUID")
-      .get(
-        asyncHandler((req: Request, res: Response) =>
-          this._userController.getPlayerRole(req, res),
-        ),
-      );
+    this._routers.route("/playerRole/:minecraftUUID").get(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._userController.getPlayerRole(req, res),
+      ),
+    );
 
-    this._routers
-      .route("/dashboard")
-      .get(
-        asyncHandler((req: Request, res: Response) =>
-          this._userController.getPanelUsers(req, res),
-        ),
-      );
+    this._routers.route("/dashboard").get(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._userController.getPanelUsers(req, res),
+      ),
+    );
 
-    this._routers
-      .route("/dashboard/:id")
-      .get(
-        asyncHandler((req: Request, res: Response) =>
-          this._userController.getPanelUser(req, res),
-        ),
-      );
+    this._routers.route("/dashboard/:id").get(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._userController.getPanelUser(req, res),
+      ),
+    );
   }
 }

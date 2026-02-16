@@ -22,6 +22,7 @@ export default class WhitelistRoutes extends IRoutes {
     this._routers
       .route("/awaitVerify/:discordId")
       .get(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.getAwaitVerify(req, res),
         ),
@@ -36,6 +37,7 @@ export default class WhitelistRoutes extends IRoutes {
     this._routers
       .route("/manualVerify")
       .get(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.getAllManualVerify(req, res),
         ),
@@ -47,17 +49,17 @@ export default class WhitelistRoutes extends IRoutes {
         ),
       );
 
-    this._routers
-      .route("/manualVerify/:discordUserId")
-      .get(
-        asyncHandler((req: Request, res: Response) =>
-          this._whitelistController.getManualVerify(req, res),
-        ),
-      );
+    this._routers.route("/manualVerify/:discordUserId").get(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._whitelistController.getManualVerify(req, res),
+      ),
+    );
 
     this._routers
       .route("/manualVerify/:channelId/:messageId")
       .get(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.getManualVerifyCIdMId(req, res),
         ),
@@ -72,6 +74,7 @@ export default class WhitelistRoutes extends IRoutes {
     this._routers
       .route("/serverWhitelist")
       .get(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.getAllServerWhitelist(req, res),
         ),
@@ -86,6 +89,7 @@ export default class WhitelistRoutes extends IRoutes {
     this._routers
       .route("/serverWhitelist/:minecraftUUID")
       .get(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.getServerWhitelist(req, res),
         ),
@@ -97,17 +101,17 @@ export default class WhitelistRoutes extends IRoutes {
         ),
       );
 
-    this._routers
-      .route("/serverWhitelist/:minecraftUUID/:serverId")
-      .get(
-        asyncHandler((req: Request, res: Response) =>
-          this._whitelistController.getServerWhitelistServerId(req, res),
-        ),
-      );
+    this._routers.route("/serverWhitelist/:minecraftUUID/:serverId").get(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._whitelistController.getServerWhitelistServerId(req, res),
+      ),
+    );
 
     this._routers
       .route("/tpmeVerifyWhitelist")
       .get(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.getAllTpmeVerifyWhitelist(req, res),
         ),

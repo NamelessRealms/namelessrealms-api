@@ -7,12 +7,15 @@ export default class ModsController {
   private _modsService = new ModsService();
 
   /**
+  /**
    * @openapi
    * /mods/{projectId}/file/{fileId}:
    *   get:
    *     tags:
    *       - Mods
    *     summary: 取得單一 Mod 檔案資訊
+   *     security:
+   *       - bearerAuth: []
    *     parameters:
    *       - in: path
    *         name: projectId
@@ -49,6 +52,8 @@ export default class ModsController {
    *     tags:
    *       - Mods
    *     summary: 批量取得 Mods 資訊
+   *     security:
+   *       - bearerAuth: []
    *     requestBody:
    *       required: true
    *       content:
@@ -90,6 +95,8 @@ export default class ModsController {
    *     tags:
    *       - Mods
    *     summary: 批量取得 Mod 檔案資訊
+   *     security:
+   *       - bearerAuth: []
    *     requestBody:
    *       required: true
    *       content:

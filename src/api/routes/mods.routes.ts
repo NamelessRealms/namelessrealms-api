@@ -13,22 +13,23 @@ export default class ModsRoutes extends IRoutes {
   protected _loadRoutes(): void {
     this._routers.post(
       "",
+      this._authJwtVerify.verifyToken,
       asyncHandler((req: Request, res: Response) =>
         this._modsController.getMods(req, res),
       ),
     );
     this._routers.post(
       "/files",
+      this._authJwtVerify.verifyToken,
       asyncHandler((req: Request, res: Response) =>
         this._modsController.getModFiles(req, res),
       ),
     );
-    this._routers
-      .route("/:projectId/file/:fileId")
-      .get(
-        asyncHandler((req: Request, res: Response) =>
-          this._modsController.getMod(req, res),
-        ),
-      );
+    this._routers.route("/:projectId/file/:fileId").get(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._modsController.getMod(req, res),
+      ),
+    );
   }
 }

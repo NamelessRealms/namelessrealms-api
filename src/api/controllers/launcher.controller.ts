@@ -15,6 +15,8 @@ export default class LauncherController {
    *     tags:
    *       - Launcher
    *     summary: 取得 Launcher 資產設定 (V1)
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       200:
    *         description: 成功
@@ -35,6 +37,8 @@ export default class LauncherController {
    *     tags:
    *       - Launcher
    *     summary: 取得 Launcher 資產設定 (V2)
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       200:
    *         description: 成功
@@ -56,6 +60,8 @@ export default class LauncherController {
    *     tags:
    *       - Launcher
    *     summary: 取得 Launcher 頁面設定
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       200:
    *         description: 成功
@@ -69,6 +75,25 @@ export default class LauncherController {
     response.status(200).json(launcherPageData);
   }
 
+  /**
+   * @openapi
+   * /launcher/page:
+   *   put:
+   *     tags:
+   *       - Launcher
+   *     summary: 修改 Launcher 頁面設定
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *     responses:
+   *       201:
+   *         description: 修改成功
+   */
   public async putLauncherAssets(
     request: Request,
     response: Response,
@@ -173,6 +198,8 @@ export default class LauncherController {
    *     tags:
    *       - Launcher
    *     summary: 轉發至 Discord Webhook
+   *     security:
+   *       - bearerAuth: []
    *     description: 支援 multipart/form-data 格式，可上傳檔案與 payload_json。
    *     requestBody:
    *       content:
@@ -216,7 +243,7 @@ export default class LauncherController {
     form.append("payload_json", payloadJson);
 
     await new Promise<void>((resolve, reject) => {
-      form.submit(webhooksErrorUrl, (error) => {
+      form.submit(webhooksErrorUrl, (error: any) => {
         if (error) {
           return reject(new AppError("webhooks send error", 404));
         }

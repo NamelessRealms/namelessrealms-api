@@ -15,6 +15,7 @@ export default class SponsorRouter extends IRoutes {
     this._routers
       .route("/user")
       .get(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._sponsorController.getAllSponsorUser(req, res),
         ),
@@ -29,6 +30,7 @@ export default class SponsorRouter extends IRoutes {
     this._routers
       .route("/user/:uuid")
       .get(
+        this._authJwtVerify.verifyToken,
         asyncHandler((req: Request, res: Response) =>
           this._sponsorController.getSponsorUser(req, res),
         ),

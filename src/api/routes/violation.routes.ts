@@ -12,12 +12,11 @@ export default class ViolationRouter extends IRoutes {
   }
 
   protected _loadRoutes(): void {
-    this._routers
-      .route("/user/:id")
-      .get(
-        asyncHandler((req: Request, res: Response) =>
-          this._violationController.getViolationUser(req, res),
-        ),
-      );
+    this._routers.route("/user/:id").get(
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._violationController.getViolationUser(req, res),
+      ),
+    );
   }
 }

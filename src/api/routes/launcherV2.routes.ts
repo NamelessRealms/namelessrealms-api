@@ -28,6 +28,7 @@ export default class LauncherV2Router extends IRoutes {
       );
 
     this._routers.route("/webhooks/discord").post(
+      this._authJwtVerify.verifyToken,
       multer().any() as any,
       asyncHandler((req: Request, res: Response) =>
         this._launcherController.postDiscordWebhooks(req, res),

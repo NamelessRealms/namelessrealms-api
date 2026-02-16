@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 
 import * as jwt from "jsonwebtoken";
+import { AppError } from "../utils/response/AppError";
 import { config } from "../../config/config.service";
 import * as socketIo from "socket.io";
 import { ExtendedError } from "socket.io/dist/namespace";
@@ -21,10 +22,7 @@ export default class AuthJwtVerify {
 
       // 沒有 token
       if (!token) {
-        return response.status(401).json({
-          error: "invalid_client",
-          error_description: "沒有 Token。",
-        });
+        throw new AppError("沒有 Token。", 401);
       }
 
       request.user = jwt.verify(token, config.jwt.secret) as IDecoded;
@@ -34,16 +32,12 @@ export default class AuthJwtVerify {
       switch (error.name) {
         // JWT 過期
         case "TokenExpiredError":
-          return response.status(400).json({
-            error: "invalid_grant",
-            error_description: "Token 過期。",
-          });
+          throw new AppError("Token 過期。", 401);
         // JWT 無效
         case "JsonWebTokenError":
-          return response.status(400).json({
-            error: "invalid_grant",
-            error_description: "Token 無效。",
-          });
+          throw new AppError("Token 無效。", 401);
+        default:
+          throw error;
       }
     }
   }
@@ -108,10 +102,7 @@ export default class AuthJwtVerify {
       case null:
       case "user":
       case "guest":
-        return response.status(400).json({
-          error: "unauthorized_client",
-          error_description: "無權限。",
-        });
+        throw new AppError("無權限。", 403);
     }
 
     return next();

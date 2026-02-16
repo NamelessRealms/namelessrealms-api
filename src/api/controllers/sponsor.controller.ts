@@ -15,6 +15,8 @@ export default class SponsorController {
    *     tags:
    *       - Sponsor
    *     summary: 取得所有贊助者列表
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       200:
    *         description: 成功
@@ -174,6 +176,8 @@ export default class SponsorController {
    *     tags:
    *       - Sponsor
    *     summary: 取得單一贊助者資訊
+   *     security:
+   *       - bearerAuth: []
    *     parameters:
    *       - in: path
    *         name: uuid
