@@ -66,7 +66,7 @@ export default class UserService {
     }
 
     public async getPanelUser(id: string): Promise<IPanelUser> {
-        const panelUsers = await Mysql.getPool().query("SELECT * FROM dashboard_user_roles WHERE github_user_id = ?", [id]);        
+        const panelUsers = await Mysql.getPool().query("SELECT * FROM dashboard_user_roles WHERE github_user_id = ?", [id]);
         return (panelUsers[0] as Array<IPanelUser>)[0];
     }
 }

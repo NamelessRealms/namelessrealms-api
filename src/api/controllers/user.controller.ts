@@ -3,119 +3,106 @@ import { Request, Response } from "express";
 import UserService from "../services/user/user.service";
 import IUserLink from "../../interface/user/IUserLink";
 import VerifyRequestParameter from "../utils/verify/verifyRequestParameter";
-import ReplyError from "../utils/response/replyError";
-import Logs from "../utils/logs";
+import { AppError } from "../utils/response/AppError";
 
 export default class UserController {
+  private _userService = new UserService();
 
-    private _userService = new UserService();
+  public async getAllUserLink(
+    request: Request,
+    response: Response,
+  ): Promise<void> {
+    const userLinkData = await this._userService.getAllUserLink();
 
-    public async getAllUserLink(request: Request, response: Response): Promise<void> {
-        try {
+    if (userLinkData.length !== 0) {
+      response.status(200).json(userLinkData);
+    } else {
+      response.status(204).send();
+    }
+  }
 
-            const userLinkData = await this._userService.getAllUserLink();
+  public async createUserLink(
+    request: Request,
+    response: Response,
+  ): Promise<void> {
+    const bodyData: IUserLink | IUserLink[] = request.body;
 
-            if (userLinkData.length !== 0) {
-                response.status(200).json(userLinkData);
-            } else {
-                response.status(204).send();
-            }
-
-        } catch (error: any) {
-            Logs.error(error);
-            ReplyError.replyServerError(response);
-        }
+    // 確保客戶端必要的參數
+    if (
+      !VerifyRequestParameter.verify(bodyData, ["minecraft_uuid", "discord_id"])
+    ) {
+      throw new AppError("通訊協定錯誤，遺漏必要的參數或者參數格式錯誤。", 400);
     }
 
-    public async createUserLink(request: Request, response: Response): Promise<void> {
+    const createUserLink = await this._userService.createUserLink(bodyData);
 
-        const bodyData: IUserLink | IUserLink[] = request.body;
-
-        // 確保客戶端必要的參數
-        if (!VerifyRequestParameter.verify(bodyData, ["minecraft_uuid", "discord_id"])) {
-            return ReplyError.replyParameterError(response);
-        }
-
-        try {
-
-            const createUserLink = await this._userService.createUserLink(bodyData);
-
-            if (createUserLink.modified) {
-                response.status(201).json({
-                    message: "success",
-                    info: bodyData
-                });
-            } else {
-                response.status(304).send();
-            }
-
-        } catch (error: any) {
-            Logs.error(error);
-            ReplyError.replyServerError(response);
-        }
+    if (createUserLink.modified) {
+      response.status(201).json({
+        message: "success",
+        info: bodyData,
+      });
+    } else {
+      response.status(304).send();
     }
+  }
 
-    public async getUserLink(request: Request, response: Response): Promise<void> {
+  public async getUserLink(
+    request: Request,
+    response: Response,
+  ): Promise<void> {
+    // minecraft player uuid or discord user id
+    const id = request.params.id;
 
-        // minecraft player uuid or discord user id
-        const id = request.params.id;
+    const userLinkData = await this._userService.getUserLink(id);
 
-        const userLinkData = await this._userService.getUserLink(id);
-
-        if (userLinkData !== undefined) {
-            response.status(200).json(userLinkData);
-        } else {
-            response.status(204).send();
-        }
+    if (userLinkData !== undefined) {
+      response.status(200).json(userLinkData);
+    } else {
+      response.status(204).send();
     }
+  }
 
-    public async getPlayerRole(request: Request, response: Response): Promise<void> {
+  public async getPlayerRole(
+    request: Request,
+    response: Response,
+  ): Promise<void> {
+    const minecraftUUID = request.params.minecraftUUID;
 
-        const minecraftUUID = request.params.minecraftUUID;
+    const playerRoleData = await this._userService.getPlayerRole(minecraftUUID);
 
-        const playerRoleData = await this._userService.getPlayerRole(minecraftUUID);
-
-        if (playerRoleData !== undefined) {
-            response.status(200).json(playerRoleData);
-        } else {
-            response.status(204).send();
-        }
+    if (playerRoleData !== undefined) {
+      response.status(200).json(playerRoleData);
+    } else {
+      response.status(204).send();
     }
+  }
 
-    public async getPanelUsers(request: Request, response: Response): Promise<void> {
-        try {
+  public async getPanelUsers(
+    request: Request,
+    response: Response,
+  ): Promise<void> {
+    const panelUsers = await this._userService.getPanelUsers();
 
-            const panelUsers = await this._userService.getPanelUsers();
-
-            if (panelUsers.length !== 0) {
-                response.status(200).json(panelUsers);
-            } else {
-                response.status(204).send();
-            }
-
-        } catch (error: any) {
-            Logs.error(error);
-            ReplyError.replyServerError(response);
-        }
+    if (panelUsers.length !== 0) {
+      response.status(200).json(panelUsers);
+    } else {
+      response.status(204).send();
     }
+  }
 
-    public async getPanelUser(request: Request, response: Response): Promise<void> {
-        try {
+  public async getPanelUser(
+    request: Request,
+    response: Response,
+  ): Promise<void> {
+    // github user id
+    const id = request.params.id;
 
-            // github user id
-            const id = request.params.id;
+    const panelUser = await this._userService.getPanelUser(id);
 
-            const panelUser = await this._userService.getPanelUser(id);
-
-            if (panelUser !== undefined) {
-                response.status(200).json(panelUser);
-            } else {
-                response.status(204).send();
-            }
-
-        } catch (error: any) {
-            Logs.error(error);
-            ReplyError.replyServerError(response);
-        }
+    if (panelUser !== undefined) {
+      response.status(200).json(panelUser);
+    } else {
+      response.status(204).send();
     }
+  }
 }
