@@ -1,15 +1,20 @@
 import * as crypto from "crypto";
 import * as jwt from "jsonwebtoken";
+import uniqid from "uniqid";
 const argon2 = require("argon2");
 
 import Mysql from "../../utils/mysql";
 
 import { IUser } from "../../../interface/auth/IUser";
+import { RegisterDTO } from "../../../interface/auth/RegisterDTO";
 import { environment } from "../../../environment/environment";
 import Logs from "../../utils/logs";
 import { config } from "../../../config/config.service";
+import MailService from "../mail.service";
+import { AppError } from "../../utils/response/AppError";
 
 export default class AuthService {
+  private _mailService = new MailService();
   /**
    *
    *
@@ -118,5 +123,87 @@ export default class AuthService {
    */
   public async hashPassword(password: string): Promise<string> {
     return await argon2.hash(password);
+  }
+
+  /**
+   * 生成並發送驗證碼
+   * @param email 收件者信箱
+   */
+  public async generateAndSaveCode(email: string): Promise<void> {
+    // 1. 生成 6 位數驗證碼
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 分鐘後過期
+
+    // 2. 存入資料庫 (假設表名為 verification_codes)
+    // 如果資料表不存在，請執行以下 SQL:
+    // CREATE TABLE verification_codes (email VARCHAR(255), code VARCHAR(6), expires_at DATETIME, PRIMARY KEY (email));
+    await Mysql.getPool().query(
+      "INSERT INTO verification_codes (email, code, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE code = ?, expires_at = ?",
+      [email, code, expiresAt, code, expiresAt],
+    );
+
+    // 3. 發送郵件
+    await this._mailService.sendVerificationCode(email, code);
+  }
+
+  /**
+   * 註冊新使用者
+   * @param data 註冊資訊
+   * @param code 驗證碼
+   */
+  public async registerUser(
+    data: RegisterDTO,
+    code: string,
+  ): Promise<void> {
+    // 0. 驗證驗證碼
+    const codeResults = await Mysql.getPool().query(
+      "SELECT * FROM verification_codes WHERE email = ? AND code = ? AND expires_at > NOW()",
+      [data.email, code],
+    );
+    const validCodes = codeResults[0] as Array<any>;
+
+    if (validCodes.length === 0) {
+      throw new AppError(
+        "驗證碼不正確或已過期。",
+        400,
+        "InvalidVerificationCode",
+      );
+    }
+
+    // 1. 檢查使用者是否已存在 (username 或 email)
+    // 註：如果資料庫目前沒有 email 欄位，這裡會報錯，請根據實際情況調整 SQL
+    const checkResults = await Mysql.getPool().query(
+      "SELECT * FROM users WHERE username = ? OR email = ?",
+      [data.username, data.email],
+    );
+    const existingUsers = checkResults[0] as Array<IUser>;
+
+    if (existingUsers.length > 0) {
+      throw new AppError(
+        "該使用者名稱或 Email 已被註冊。",
+        409,
+        "Conflict",
+      );
+    }
+
+    // 2. 密碼雜湊處理
+    const hashedPassword = await this.hashPassword(data.password);
+
+    // 3. 寫入資料庫
+    const newUser = {
+      unique: uniqid(),
+      username: data.username,
+      email: data.email,
+      password: hashedPassword,
+      roles: JSON.stringify(["user"]), // 預設權限
+    };
+
+    await Mysql.getPool().query("INSERT INTO users SET ?", [newUser]);
+
+    // 4. 刪除已使用的驗證碼
+    await Mysql.getPool().query(
+      "DELETE FROM verification_codes WHERE email = ?",
+      [data.email],
+    );
   }
 }

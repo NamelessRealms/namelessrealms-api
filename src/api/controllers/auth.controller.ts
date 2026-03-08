@@ -4,6 +4,7 @@ import { environment } from "../../environment/environment";
 import { IOAuth2 } from "../../interface/auth/IOAuth2";
 import AuthService from "../services/auth/auth.service";
 import { AppError } from "../utils/response/AppError";
+import { RegisterDTO } from "../../interface/auth/RegisterDTO";
 
 export default class AuthController {
   private _authService = new AuthService();
@@ -84,7 +85,7 @@ export default class AuthController {
 
     // 確保客戶端必要的參數
     if (!this._verifyRequest(bodyData)) {
-      throw new AppError("通訊協定錯誤，遺漏必要的參數。", 400);
+      throw new AppError("通訊協定錯誤，遺漏必要的參數。", 400, "InvalidRequest");
     }
 
     const verifyData = await this._authService.verify(bodyData);
@@ -118,5 +119,166 @@ export default class AuthController {
     }
 
     return true;
+  }
+
+  /**
+   * @openapi
+   * /auth/register:
+   *   post:
+   *     tags:
+   *       - Authentication
+   *     summary: 註冊新用戶
+   *     description: 建立新的平台帳號。
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - username
+   *               - email
+   *               - password
+   *             properties:
+   *               username:
+   *                 type: string
+   *                 example: newuser
+   *               email:
+   *                 type: string
+   *                 example: user@example.com
+   *               password:
+   *                 type: string
+   *                 example: "password123"
+   *     responses:
+   *       201:
+   *         description: 註冊成功
+   *       400:
+   *         description: 參數錯誤
+   *       409:
+   *         description: 使用者已存在
+   */
+  /**
+   * @openapi
+   * /auth/send-code:
+   *   post:
+   *     tags:
+   *       - Authentication
+   *     summary: 發送註冊驗證碼
+   *     description: 向指定的 Email 發送 6 位數驗證碼。
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - email
+   *             properties:
+   *               email:
+   *                 type: string
+   *                 example: user@example.com
+   *     responses:
+   *       200:
+   *         description: 驗證碼已發送
+   *       400:
+   *         description: Email 格式不正確
+   */
+  public async sendCode(request: Request, response: Response) {
+    const { email } = request.body;
+
+    if (!email) {
+      throw new AppError("請提供 Email。", 400, "InvalidRequest");
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new AppError("Email 格式不正確。", 400, "InvalidRequest");
+    }
+
+    await this._authService.generateAndSaveCode(email);
+
+    return response.status(200).json({
+      success: true,
+      message: "驗證碼已發送到您的信箱。",
+    });
+  }
+
+  /**
+   * @openapi
+   * /auth/register:
+   *   post:
+   *     tags:
+   *       - Authentication
+   *     summary: 註冊新用戶
+   *     description: 建立新的平台帳號，需提供信箱驗證碼。
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - username
+   *               - email
+   *               - password
+   *               - code
+   *             properties:
+   *               username:
+   *                 type: string
+   *               email:
+   *                 type: string
+   *               password:
+   *                 type: string
+   *               code:
+   *                 type: string
+   *                 example: "123456"
+   *     responses:
+   *       201:
+   *         description: 註冊成功
+   *       400:
+   *         description: 參數錯誤或驗證碼不正確
+   *       409:
+   *         description: 使用者已存在
+   */
+  public async register(request: Request, response: Response) {
+    const { username, email, password, code } = request.body;
+
+    // 1. 基本驗證
+    if (!username || !email || !password || !code) {
+      throw new AppError("遺漏必要的註冊參數或驗證碼。", 400, "InvalidRequest");
+    }
+
+    // 簡單的 Email 格式驗證
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new AppError("Email 格式不正確。", 400, "InvalidRequest");
+    }
+
+    // 密碼長度驗證
+    if (password.length < 6) {
+      throw new AppError("密碼長度必須至少為 6 個字元。", 400, "InvalidRequest");
+    }
+
+    try {
+      // 2. 呼叫 Service 執行註冊
+      await this._authService.registerUser({ username, email, password }, code);
+
+      // 3. 回傳成功
+      return response.status(201).json({
+        success: true,
+        message: "註冊成功！",
+      });
+    } catch (error: any) {
+      // 如果 Service 拋出 409，則傳遞給全域錯誤處理器或在此處理
+      if (error.status === 409) {
+        return response.status(409).json({
+          success: false,
+          code: "Conflict",
+          error: error.message,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   }
 }

@@ -11,7 +11,9 @@ export const errorMiddleware = (
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: false,
+      code: err.code,
       error: err.message,
+      message: err.message,
       isOperational: err.isOperational,
     });
   }
@@ -21,6 +23,8 @@ export const errorMiddleware = (
 
   return res.status(500).json({
     success: false,
+    code: "UnknownError",
     error: "伺服器發生非預期的錯誤。",
+    message: "伺服器發生非預期的錯誤。",
   });
 };
