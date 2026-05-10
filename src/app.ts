@@ -86,8 +86,7 @@ export default class App {
   private _settings(): void {
     this._app.set("views", path.join(__dirname, "views"));
     // this._app.set("view engine", "ejs");
-    this._app.enable("trust proxy");
-    // this._app.set("trust proxy", "127.0.0.1");
+    this._app.set("trust proxy", 1);
   }
 
   private _middleware(): void {
