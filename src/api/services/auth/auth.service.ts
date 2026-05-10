@@ -27,11 +27,11 @@ export default class AuthService {
   ): Promise<{ tokenCode: string; username: string; role: string[] }> {
     // 驗證 OAuth 2.0 授權類型
     if (!verifyData.grant_type || verifyData.grant_type !== "password") {
-      throw {
-        error: "unsupported_response_type",
-        error_description:
-          "授權伺服器不支援要求中的回應類型，本伺服器僅支持 Password 類型。",
-      };
+      throw new AppError(
+        "登入方式不支援，請重新操作。",
+        400,
+        "InvalidRequest",
+      );
     }
 
     // 1. 先根據使用者名稱搜尋使用者 (不再直接在 SQL 比對密碼，為了實作 Lazy Migration)
@@ -42,10 +42,11 @@ export default class AuthService {
     const users = results[0] as Array<IUser>;
 
     if (users.length === 0) {
-      throw {
-        error: "invalid_client",
-        error_description: "用戶端驗證失敗。",
-      };
+      throw new AppError(
+        "帳號或密碼錯誤。",
+        401,
+        "InvalidCredentials",
+      );
     }
 
     const user = users[0];
@@ -72,10 +73,11 @@ export default class AuthService {
     }
 
     if (!isPasswordMatch) {
-      throw {
-        error: "invalid_client",
-        error_description: "用戶端驗證失敗。",
-      };
+      throw new AppError(
+        "帳號或密碼錯誤。",
+        401,
+        "InvalidCredentials",
+      );
     }
 
     // 3. Lazy Migration: 如果密碼正確且是舊格式，則升級為 Argon2
@@ -99,10 +101,10 @@ export default class AuthService {
 
     // 4. 產生 OAuth 2.0 和 JWT 的 JSON 格式令牌訊息
     const payload = {
-      _id: user.unique,
-      iss: user.username,
-      sub: "Mkl System Web API",
-      role: user.roles,
+      sub: user.unique,
+      username: user.username,
+      iss: "NR System API",
+      role: user.roles
     };
 
     const token = jwt.sign(payload, config.jwt.secret, {
@@ -131,7 +133,7 @@ export default class AuthService {
    */
   public async generateAndSaveCode(email: string): Promise<void> {
     // 1. 生成 6 位數驗證碼
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 分鐘後過期
 
     // 2. 存入資料庫 (假設表名為 verification_codes)
@@ -151,10 +153,10 @@ export default class AuthService {
    * @param data 註冊資訊
    * @param code 驗證碼
    */
-  public async registerUser(
-    data: RegisterDTO,
-    code: string,
-  ): Promise<void> {
+  public async registerUser(data: RegisterDTO, code: string): Promise<{
+    accessToken: string,
+    refreshToken: string
+  }> {
     // 0. 驗證驗證碼
     const codeResults = await Mysql.getPool().query(
       "SELECT * FROM verification_codes WHERE email = ? AND code = ? AND expires_at > NOW()",
@@ -189,21 +191,48 @@ export default class AuthService {
     // 2. 密碼雜湊處理
     const hashedPassword = await this.hashPassword(data.password);
 
+    const id = uniqid();
+    const roles = JSON.stringify(["user"]); // 預設權限
+
     // 3. 寫入資料庫
     const newUser = {
-      unique: uniqid(),
+      unique: id,
       username: data.username,
       email: data.email,
       password: hashedPassword,
-      roles: JSON.stringify(["user"]), // 預設權限
+      roles
     };
 
     await Mysql.getPool().query("INSERT INTO users SET ?", [newUser]);
+
+    const payload = {
+      sub: id,
+      username: data.username,
+      iss: "NR System API",
+      role: roles
+    };
+
+    // Access Token: 短效 (15分鐘)
+    const accessToken = jwt.sign(payload, config.jwt.secret, {
+      algorithm: "HS256",
+      expiresIn: "15m",
+    });
+
+    // Refresh Token: 長效 (7天)
+    const refreshToken = jwt.sign(payload, config.jwt.refreshSecret, {
+      algorithm: "HS256",
+      expiresIn: "7d"
+    });
 
     // 4. 刪除已使用的驗證碼
     await Mysql.getPool().query(
       "DELETE FROM verification_codes WHERE email = ?",
       [data.email],
     );
+
+    return {
+      accessToken,
+      refreshToken
+    }
   }
 }

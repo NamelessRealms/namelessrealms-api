@@ -98,6 +98,10 @@ export default class AuthJwtVerify {
     next: NextFunction,
   ) {
     // 如不是 admin，則無權限
+    if (!request.user) {
+      throw new AppError("無權限。", 403);
+    }
+
     switch (request.user.role) {
       case null:
       case "user":

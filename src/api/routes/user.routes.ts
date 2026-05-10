@@ -15,7 +15,7 @@ export default class UserRouter extends IRoutes {
     this._routers
       .route("/userLink")
       .get(
-        this._authJwtVerify.verifyToken,
+        (req, res, next) => this._verifyApiKey.verifyOrJwt(req, res, next),
         asyncHandler((req: Request, res: Response) =>
           this._userController.getAllUserLink(req, res),
         ),
@@ -29,7 +29,7 @@ export default class UserRouter extends IRoutes {
 
     // id: minecraft player uuid or discord user id
     this._routers.route("/userLink/:id").get(
-      this._authJwtVerify.verifyToken,
+      (req, res, next) => this._verifyApiKey.verifyOrJwt(req, res, next),
       asyncHandler((req: Request, res: Response) =>
         this._userController.getUserLink(req, res),
       ),

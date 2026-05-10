@@ -13,7 +13,7 @@ export default class WhitelistRoutes extends IRoutes {
 
   protected _loadRoutes(): void {
     this._routers.route("/awaitVerify").post(
-      this._authJwtVerify.verifyToken,
+      (req, res, next) => this._verifyApiKey.verifyOrJwt(req, res, next),
       asyncHandler((req: Request, res: Response) =>
         this._whitelistController.createAwaitVerify(req, res),
       ),
@@ -22,7 +22,7 @@ export default class WhitelistRoutes extends IRoutes {
     this._routers
       .route("/awaitVerify/:discordId")
       .get(
-        this._authJwtVerify.verifyToken,
+        (req, res, next) => this._verifyApiKey.verifyOrJwt(req, res, next),
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.getAwaitVerify(req, res),
         ),
@@ -74,13 +74,13 @@ export default class WhitelistRoutes extends IRoutes {
     this._routers
       .route("/serverWhitelist")
       .get(
-        this._authJwtVerify.verifyToken,
+        (req, res, next) => this._verifyApiKey.verifyOrJwt(req, res, next),
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.getAllServerWhitelist(req, res),
         ),
       )
       .post(
-        this._authJwtVerify.verifyToken,
+        (req, res, next) => this._verifyApiKey.verifyOrJwt(req, res, next),
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.createServerWhitelist(req, res),
         ),
@@ -89,7 +89,7 @@ export default class WhitelistRoutes extends IRoutes {
     this._routers
       .route("/serverWhitelist/:minecraftUUID")
       .get(
-        this._authJwtVerify.verifyToken,
+        (req, res, next) => this._verifyApiKey.verifyOrJwt(req, res, next),
         asyncHandler((req: Request, res: Response) =>
           this._whitelistController.getServerWhitelist(req, res),
         ),

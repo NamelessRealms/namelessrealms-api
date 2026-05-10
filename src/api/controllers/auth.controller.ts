@@ -261,13 +261,16 @@ export default class AuthController {
 
     try {
       // 2. 呼叫 Service 執行註冊
-      await this._authService.registerUser({ username, email, password }, code);
+      const verifyData = await this._authService.registerUser({ username, email, password }, code);
 
       // 3. 回傳成功
       return response.status(201).json({
         success: true,
         message: "註冊成功！",
+        access_token: verifyData.accessToken,
+        refresh_token: verifyData.refreshToken,
       });
+
     } catch (error: any) {
       // 如果 Service 拋出 409，則傳遞給全域錯誤處理器或在此處理
       if (error.status === 409) {

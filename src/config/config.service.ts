@@ -9,7 +9,16 @@ interface IDatabaseConfig {
 
 interface IJwtConfig {
   secret: string;
+  refreshSecret: string;
   salt: string;
+}
+
+interface IMailConfig {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  from: string;
 }
 
 interface IConfig {
@@ -17,6 +26,7 @@ interface IConfig {
   port: number;
   db: IDatabaseConfig;
   jwt: IJwtConfig;
+  mail: IMailConfig;
   curseforgeKey: string;
   webhooksErrorUrl: string;
   ssl?: {
@@ -53,10 +63,18 @@ export default class ConfigService {
       },
       jwt: {
         secret: process.env.JWT_SECRET || "",
+        refreshSecret: process.env.JWT_REFRESH_SECRET || "",
         salt: process.env.JWT_SALT || "",
       },
       curseforgeKey: process.env.CURSEFORGE_KEY || "",
       webhooksErrorUrl: process.env.WEBHOOKS_ERROR_URL || "",
+      mail: {
+        host: process.env.SMTP_HOST || "",
+        port: parseInt(process.env.SMTP_PORT || "587", 10),
+        user: process.env.SMTP_USER || "",
+        pass: process.env.SMTP_PASS || "",
+        from: process.env.SMTP_FROM || "",
+      },
       ssl:
         process.env.SSL_KEY_PATH && process.env.SSL_CSR_PATH
           ? {
@@ -68,15 +86,6 @@ export default class ConfigService {
   }
 
   private _validateConfig(): void {
-    const requiredFields: (keyof IConfig | string)[] = [
-      "db.host",
-      "db.user",
-      "db.pass",
-      "db.name",
-      "jwt.secret",
-      "jwt.salt",
-    ];
-
     const missingFields: string[] = [];
 
     if (!this._config.db.host) missingFields.push("MYSQL_HOST");
@@ -84,6 +93,7 @@ export default class ConfigService {
     if (!this._config.db.pass) missingFields.push("MYSQL_PASSWORD");
     if (!this._config.db.name) missingFields.push("MYSQL_DATABASE");
     if (!this._config.jwt.secret) missingFields.push("JWT_SECRET");
+    if (!this._config.jwt.refreshSecret) missingFields.push("JWT_REFRESH_SECRET");
     if (!this._config.jwt.salt) missingFields.push("JWT_SALT");
 
     if (missingFields.length > 0) {
@@ -113,6 +123,9 @@ export default class ConfigService {
   }
   public get webhooksErrorUrl() {
     return this._config.webhooksErrorUrl;
+  }
+  public get mail() {
+    return this._config.mail;
   }
   public get ssl() {
     return this._config.ssl;

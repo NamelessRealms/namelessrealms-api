@@ -1,17 +1,18 @@
 {
     "compilerOptions": {
         "target": "es2015",
-        "module": "commonJS",
+        "module": "commonjs",
         "outDir": "./dist",
+        "rootDir": "./src",
         "forceConsistentCasingInFileNames": true,
         "strict": true,
         "noImplicitReturns": true,
         "noFallthroughCasesInSwitch": true,
         "sourceMap": true,
         "declaration": false,
-        "downlevelIteration": true,
         "experimentalDecorators": true,
         "moduleResolution": "node",
+        "ignoreDeprecations": "6.0",
         "importHelpers": true,
         "esModuleInterop": true,
         "skipLibCheck": true
@@ -20,7 +21,7 @@
         "src"
     ],
     "exclude": [
-        "mode_modules"
+        "node_modules"
     ],
     "files": [
         "types.d.ts"

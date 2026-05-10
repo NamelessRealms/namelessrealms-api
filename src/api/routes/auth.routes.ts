@@ -18,5 +18,19 @@ export default class AuthRoutes extends IRoutes {
         this._authController.login(req, res),
       ),
     );
+
+    this._routers.post(
+      "/register",
+      asyncHandler((req: Request, res: Response) =>
+        this._authController.register(req, res),
+      ),
+    );
+
+    this._routers.post(
+      "/auth/send-code",
+      asyncHandler((req: Request, res: Response) =>
+        this._authController.sendCode(req, res),
+      ),
+    );
   }
 }
