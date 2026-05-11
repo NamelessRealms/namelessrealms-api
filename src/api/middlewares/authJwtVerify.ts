@@ -18,12 +18,17 @@ interface IDecoded {
 export default class AuthJwtVerify {
   public verifyToken(request: Request, response: Response, next: NextFunction) {
     try {
-      const token = request.headers.authorization as string;
+      const authHeader = request.headers.authorization as string;
 
       // 沒有 token
-      if (!token) {
+      if (!authHeader) {
         throw new AppError("沒有 Token。", 401);
       }
+
+      // 支援標準 "Bearer <token>" 及裸 token 兩種格式
+      const token = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : authHeader;
 
       request.user = jwt.verify(token, config.jwt.secret) as IDecoded;
 

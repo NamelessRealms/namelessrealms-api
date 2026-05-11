@@ -1,5 +1,6 @@
 import ICreateSql from "../../../interface/Sql/ICreateSql";
 import IUserLink from "../../../interface/user/IUserLink";
+import IMinecraftAccount from "../../../interface/user/IMinecraftAccount";
 import Sql from "../../utils/database/sql";
 import Mysql from "../../utils/mysql";
 
@@ -68,6 +69,22 @@ export default class UserService {
     public async getPanelUser(id: string): Promise<IPanelUser> {
         const panelUsers = await Mysql.getPool().query("SELECT * FROM dashboard_user_roles WHERE github_user_id = ?", [id]);
         return (panelUsers[0] as Array<IPanelUser>)[0];
+    }
+
+    public async linkMinecraftAccount(userId: string, minecraftUuid: string, minecraftUsername: string): Promise<void> {
+        await Mysql.getPool().query(
+            "INSERT INTO minecraft_accounts (user_id, minecraft_uuid, minecraft_username) VALUES (?, ?, ?) " +
+            "ON DUPLICATE KEY UPDATE minecraft_uuid = ?, minecraft_username = ?, linked_at = CURRENT_TIMESTAMP",
+            [userId, minecraftUuid, minecraftUsername, minecraftUuid, minecraftUsername]
+        );
+    }
+
+    public async getLinkedMinecraftAccount(userId: string): Promise<IMinecraftAccount | undefined> {
+        const result = await Mysql.getPool().query(
+            "SELECT * FROM minecraft_accounts WHERE user_id = ?",
+            [userId]
+        );
+        return (result[0] as Array<IMinecraftAccount>)[0];
     }
 }
 

@@ -55,5 +55,20 @@ export default class UserRouter extends IRoutes {
         this._userController.getPanelUser(req, res),
       ),
     );
+
+    this._routers
+      .route("/minecraft-account")
+      .get(
+        this._authJwtVerify.verifyToken,
+        asyncHandler((req: Request, res: Response) =>
+          this._userController.getLinkedMinecraftAccount(req, res),
+        ),
+      )
+      .post(
+        this._authJwtVerify.verifyToken,
+        asyncHandler((req: Request, res: Response) =>
+          this._userController.linkMinecraftAccount(req, res),
+        ),
+      );
   }
 }
