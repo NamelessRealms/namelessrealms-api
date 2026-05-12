@@ -35,5 +35,13 @@ export default class AuthRoutes extends IRoutes {
         this._authController.sendCode(req, res),
       ),
     );
+
+    this._routers.get(
+      "/auth/validate",
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._authController.validateSession(req, res),
+      ),
+    );
   }
 }

@@ -4,7 +4,6 @@ import { environment } from "../../environment/environment";
 import { IOAuth2 } from "../../interface/auth/IOAuth2";
 import AuthService from "../services/auth/auth.service";
 import { AppError } from "../utils/response/AppError";
-import { RegisterDTO } from "../../interface/auth/RegisterDTO";
 
 export default class AuthController {
   private _authService = new AuthService();
@@ -83,26 +82,49 @@ export default class AuthController {
   public async login(request: Request, response: Response) {
     const bodyData: IOAuth2 = request.body;
 
-    // 確保客戶端必要的參數
-    if (!this._verifyRequest(bodyData)) {
+    if (!bodyData.grant_type) {
       throw new AppError("通訊協定錯誤，遺漏必要的參數。", 400, "InvalidRequest");
     }
-
-    const verifyData = await this._authService.verify(bodyData);
 
     // 確保客戶端不會緩存此請求
     response.header("Cache-Control", "no-store");
     response.header("Pragma", "no-cache");
 
-    return response.status(200).json({
-      access_token: verifyData.tokenCode,
-      token_type: "bearer",
-      expires_in: new Date().getTime() + environment.jwt.increaseTime,
-      scope: verifyData.role,
-      info: {
-        username: verifyData.username,
-      },
-    });
+    if (bodyData.grant_type === "refresh_token") {
+      if (!bodyData.refresh_token) {
+        throw new AppError("通訊協定錯誤，遺漏必要的參數。", 400, "InvalidRequest");
+      }
+      const refreshData = await this._authService.refreshAccessToken(bodyData.refresh_token);
+      return response.status(200).json({
+        access_token: refreshData.accessToken,
+        token_type: "bearer",
+        expires_in: new Date().getTime() + environment.jwt.increaseTime,
+        scope: refreshData.role,
+        refresh_token: refreshData.refreshToken,
+        info: { username: refreshData.username },
+      });
+    }
+
+    if (bodyData.grant_type === "password") {
+      if (!this._verifyRequest(bodyData)) {
+        throw new AppError("通訊協定錯誤，遺漏必要的參數。", 400, "InvalidRequest");
+      }
+      const verifyData = await this._authService.verify(bodyData);
+      return response.status(200).json({
+        access_token: verifyData.tokenCode,
+        token_type: "bearer",
+        expires_in: new Date().getTime() + environment.jwt.increaseTime,
+        scope: verifyData.role,
+        refresh_token: verifyData.refreshToken,
+        info: { username: verifyData.username },
+      });
+    }
+
+    throw new AppError("登入方式不支援，請重新操作。", 400, "InvalidRequest");
+  }
+
+  public async validateSession(_request: Request, response: Response) {
+    return response.status(200).json({ success: true });
   }
 
   private _verifyRequest(requestBody: any): boolean {

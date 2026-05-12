@@ -24,7 +24,7 @@ export default class AuthService {
    */
   public async verify(
     verifyData: any,
-  ): Promise<{ tokenCode: string; username: string; role: string[] }> {
+  ): Promise<{ tokenCode: string; refreshToken: string; username: string; role: string[] }> {
     // 驗證 OAuth 2.0 授權類型
     if (!verifyData.grant_type || verifyData.grant_type !== "password") {
       throw new AppError(
@@ -112,10 +112,16 @@ export default class AuthService {
       expiresIn: `${environment.jwt.increaseTime}ms`,
     });
 
+    const refreshToken = jwt.sign(payload, config.jwt.refreshSecret, {
+      algorithm: "HS256",
+      expiresIn: "7d",
+    });
+
     return {
       tokenCode: token,
+      refreshToken,
       username: user.username,
-      role: user.roles as unknown as string[], // 修正型別問題
+      role: user.roles as unknown as string[],
     };
   }
 
@@ -234,5 +240,54 @@ export default class AuthService {
       accessToken,
       refreshToken
     }
+  }
+
+  public async refreshAccessToken(refreshToken: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    username: string;
+    role: string[];
+  }> {
+    let decoded: any;
+    try {
+      decoded = jwt.verify(refreshToken, config.jwt.refreshSecret);
+    } catch {
+      throw new AppError("Refresh Token 無效或已過期。", 401, "Unauthorized");
+    }
+
+    const results = await Mysql.getPool().query(
+      "SELECT * FROM users WHERE `unique` = ?",
+      [decoded.sub],
+    );
+    const users = results[0] as Array<IUser>;
+
+    if (users.length === 0) {
+      throw new AppError("用戶不存在。", 401, "Unauthorized");
+    }
+
+    const user = users[0];
+    const payload = {
+      sub: user.unique,
+      username: user.username,
+      iss: "NR System API",
+      role: user.roles,
+    };
+
+    const newAccessToken = jwt.sign(payload, config.jwt.secret, {
+      algorithm: "HS256",
+      expiresIn: `${environment.jwt.increaseTime}ms`,
+    });
+
+    const newRefreshToken = jwt.sign(payload, config.jwt.refreshSecret, {
+      algorithm: "HS256",
+      expiresIn: "7d",
+    });
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      username: user.username,
+      role: user.roles as unknown as string[],
+    };
   }
 }
