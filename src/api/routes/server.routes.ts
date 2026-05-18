@@ -1,3 +1,8 @@
+/**
+ * @file server.routes.ts
+ * @description 社群伺服器路由（前綴 /servers）：CRUD 與圖片上傳端點
+ * @dependencies ServerController, multer, IRoutes
+ */
 import multer from "multer";
 import { Application, Request, Response } from "express";
 import ServerController from "../controllers/server.controller";

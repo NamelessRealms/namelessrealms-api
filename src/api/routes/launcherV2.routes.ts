@@ -1,3 +1,8 @@
+/**
+ * @file launcherV2.routes.ts
+ * @description Launcher V2 路由（前綴 /launcher/v2）：V2 資產設定讀寫與 Discord Webhook 轉發
+ * @dependencies LauncherController, multer, IRoutes
+ */
 import { Application, Request, Response } from "express";
 import multer from "multer";
 import LauncherController from "../controllers/launcher.controller";

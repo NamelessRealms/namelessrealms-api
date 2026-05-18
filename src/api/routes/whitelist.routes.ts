@@ -1,3 +1,8 @@
+/**
+ * @file whitelist.routes.ts
+ * @description 白名單路由（前綴 /whitelist）：awaitVerify、manualVerify、serverWhitelist、tpmeVerifyWhitelist 四組 CRUD 端點
+ * @dependencies WhitelistController, IRoutes
+ */
 import { Application, Request, Response } from "express";
 
 import WhitelistController from "../controllers/whitelist.controllers";

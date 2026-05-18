@@ -1,3 +1,13 @@
+/**
+ * @file auth.controller.ts
+ * @description 處理認證相關 HTTP 請求，包含 OAuth2 登入、Token 刷新、驗證碼發送與用戶註冊
+ * @methods
+ *   - login: OAuth2 密碼授權與 Refresh Token 流程
+ *   - validateSession: 驗證當前 JWT 是否有效
+ *   - sendCode: 向指定信箱發送 6 位數驗證碼
+ *   - register: 以驗證碼完成新用戶註冊
+ * @dependencies AuthService, AppError, environment
+ */
 import { Request, Response } from "express";
 import { environment } from "../../environment/environment";
 

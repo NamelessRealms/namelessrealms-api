@@ -1,3 +1,14 @@
+/**
+ * @file launcher.controller.ts
+ * @description 處理 Launcher 相關資源的 HTTP 請求，包含資產設定、頁面設定、自動更新與 Discord Webhook 轉發
+ * @methods
+ *   - getLauncherAssets / getLauncherAssetsV2: 取得 Launcher 資產設定（V1 / V2）
+ *   - getLauncherPage: 取得 Launcher 頁面設定
+ *   - putLauncherAssets / putLauncherAssetsV2 / putLauncherPage: 更新對應設定
+ *   - getAutoUpdaterLatest / getAutoUpdaterLatestNupkg: 重導向至 GitHub 最新 Release 檔案
+ *   - postDiscordWebhooks: 轉發 multipart 內容至 Discord Webhook
+ * @dependencies LauncherService, form-data, config.service, AppError
+ */
 import { Request, Response } from "express";
 import FormData from "form-data";
 import { config } from "../../config/config.service";

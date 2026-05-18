@@ -1,3 +1,14 @@
+/**
+ * @file sponsor.controller.ts
+ * @description 處理贊助者紀錄 CRUD 的 HTTP 請求
+ * @methods
+ *   - getAllSponsorUser: 取得所有贊助者列表
+ *   - createSponsorUser: 新增贊助紀錄
+ *   - patchSponsorUser: 累加贊助金額
+ *   - deleteSponsorUser: 刪除贊助紀錄
+ *   - getSponsorUser: 取得單一贊助者資訊
+ * @dependencies SponsorService, VerifyRequestParameter, AppError
+ */
 import { Request, Response } from "express";
 
 import ISponsorUser from "../../interface/sponsor/ISponsorUser";

@@ -1,3 +1,8 @@
+/**
+ * @file launcherOld.routes.ts
+ * @description Launcher 舊版路由（無前綴）：/launcherAssets 與 /launcherServerPage 向下相容端點
+ * @dependencies LauncherController, IRoutes
+ */
 import { Application, Request, Response } from "express";
 
 import LauncherController from "../controllers/launcher.controller";

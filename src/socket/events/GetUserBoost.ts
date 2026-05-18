@@ -1,3 +1,8 @@
+/**
+ * @file GetUserBoost.ts
+ * @description Socket 事件：GET_USER_BOOST，查詢玩家是否為 Discord 伺服器加成者（mcServer 發起，Discord 回應）
+ * @dependencies SocketIo, ISockerEvent
+ */
 import { Socket } from "socket.io";
 import SocketIo from "../SocketIo";
 import ISockerEvent, { ContainerType, IEventType, IGetUserBoostDiscord, IGetUserBoostMcServer } from "./ISockerEvent";

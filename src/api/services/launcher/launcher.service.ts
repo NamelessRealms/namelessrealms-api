@@ -1,3 +1,13 @@
+/**
+ * @file launcher.service.ts
+ * @description 管理 Launcher 資產設定、頁面設定的資料庫讀寫，以及對 GitHub Releases API 的查詢
+ * @methods
+ *   - getLauncherAssets / getLauncherAssetsV2: 從資料庫讀取 Launcher 資產設定
+ *   - getLauncherPage: 從資料庫讀取 Launcher 頁面設定
+ *   - putLauncherAssets / updateLauncherAssetsV2 / putLauncherPage: 更新對應資料庫紀錄
+ *   - getGithubReleasesLatest: 查詢 GitHub API 取得最新 Release 資訊
+ * @dependencies mysql, got
+ */
 import ICreateSql from "../../../interface/Sql/ICreateSql";
 import file from "../../utils/file/file";
 import Logs from "../../utils/logs";

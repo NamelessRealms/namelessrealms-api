@@ -1,3 +1,9 @@
+/**
+ * @file swagger.ts
+ * @description 產生 Swagger / OpenAPI 3.0 規格文件，掃描 controllers 與 routes 中的 @openapi 註解
+ * @dependencies swagger-jsdoc
+ * @notes 文件路徑為 /api-docs，於 app.ts 中掛載
+ */
 import swaggerJsdoc from "swagger-jsdoc";
 
 const options: swaggerJsdoc.Options = {

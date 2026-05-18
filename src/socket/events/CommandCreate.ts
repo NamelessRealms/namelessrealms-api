@@ -1,3 +1,8 @@
+/**
+ * @file CommandCreate.ts
+ * @description Socket 事件：COMMAND_CREATE，將 Minecraft 伺服器的玩家指令轉發給 Discord Bot
+ * @dependencies SocketIo, ISockerEvent
+ */
 import { Socket } from "socket.io";
 import SocketIo from "../SocketIo";
 import ISockerEvent, { ContainerType, ICommandMcServer, IEventType } from "./ISockerEvent";

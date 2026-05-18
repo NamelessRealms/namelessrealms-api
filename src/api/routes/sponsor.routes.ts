@@ -1,3 +1,8 @@
+/**
+ * @file sponsor.routes.ts
+ * @description 贊助者路由（前綴 /sponsor）：GET / POST /user 及 GET / PATCH / DELETE /user/:uuid
+ * @dependencies SponsorController, IRoutes
+ */
 import { Application, Request, Response } from "express";
 
 import SponsorController from "../controllers/sponsor.controller";

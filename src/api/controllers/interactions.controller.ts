@@ -1,3 +1,11 @@
+/**
+ * @file interactions.controller.ts
+ * @description 處理外部應用程式互動回呼的 HTTP 請求，追蹤 IP 存活狀態
+ * @methods
+ *   - createInteraction: 記錄來源 IP 的 ping 紀錄
+ *   - pingInteraction: 確認應用程式連線並加入互動 Map
+ * @dependencies InteractionsService
+ */
 import { Request, Response } from "express";
 import InteractionsService from "../services/Interactions/Interactions.service";
 

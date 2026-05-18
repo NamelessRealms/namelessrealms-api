@@ -1,3 +1,8 @@
+/**
+ * @file ISockerEvent.ts
+ * @description Socket 事件的介面定義與所有事件資料型別，包含訊息、指令、TPS 資訊、玩家時間等
+ * @notes ContainerType 定義三種客戶端角色：Discord Bot、Panel 後台、Minecraft 伺服器
+ */
 import { Socket } from "socket.io";
 
 export interface IMessageMcServer {

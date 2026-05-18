@@ -1,3 +1,8 @@
+/**
+ * @file auth.routes.ts
+ * @description 認證相關路由：POST /oauth2/token、POST /register、POST /auth/send-code、GET /auth/validate
+ * @dependencies AuthController, IRoutes, rateLimiters
+ */
 import { Application, Request, Response } from "express";
 
 import AuthController from "../controllers/auth.controller";

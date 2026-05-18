@@ -1,3 +1,13 @@
+/**
+ * @file user.controller.ts
+ * @description 處理使用者相關查詢與操作的 HTTP 請求，包含 Discord-Minecraft 帳號連結與後台使用者管理
+ * @methods
+ *   - getAllUserLink / createUserLink / getUserLink: 管理 Minecraft-Discord 帳號連結
+ *   - getPlayerRole: 依 Minecraft UUID 查詢玩家權限組
+ *   - getPanelUsers / getPanelUser: 取得後台使用者列表及單筆資料
+ *   - linkMinecraftAccount / getLinkedMinecraftAccount: 連結與查詢 Minecraft 帳號
+ * @dependencies UserService, VerifyRequestParameter, AppError
+ */
 import { Request, Response } from "express";
 
 import UserService from "../services/user/user.service";

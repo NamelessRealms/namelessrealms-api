@@ -1,3 +1,8 @@
+/**
+ * @file interactions.routes.ts
+ * @description 互動路由（前綴 /interactions）：/:appId/callback 與 /:appId/callback/ping
+ * @dependencies InteractionsController, IRoutes
+ */
 import { Application, Request, Response } from "express";
 import InteractionsController from "../controllers/interactions.controller";
 

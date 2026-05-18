@@ -1,3 +1,10 @@
+/**
+ * @file file.ts
+ * @description 將 Base64 編碼內容解碼並寫入對應的 Launcher 問題日誌目錄
+ * @methods
+ *   - writeFile: 依 type（github / launcher / startError）決定路徑並寫入檔案
+ * @dependencies fs-extra, dates
+ */
 import Dates from "../dates";
 import * as path from "path";
 import * as fs from "fs-extra";

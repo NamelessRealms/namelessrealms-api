@@ -1,3 +1,11 @@
+/**
+ * @file rateLimiters.ts
+ * @description 定義各端點的速率限制器，防止暴力攻擊
+ * @methods
+ *   - loginLimiter: 登入端點，15 分鐘內最多 10 次
+ *   - sendCodeLimiter: 驗證碼發送端點，10 分鐘內最多 3 次
+ * @dependencies express-rate-limit
+ */
 import rateLimit from "express-rate-limit";
 
 export const loginLimiter = rateLimit({

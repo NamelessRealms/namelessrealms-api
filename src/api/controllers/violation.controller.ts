@@ -1,3 +1,10 @@
+/**
+ * @file violation.controller.ts
+ * @description 處理違規使用者查詢的 HTTP 請求
+ * @methods
+ *   - getViolationUser: 依 Minecraft UUID 或 Discord ID 查詢違規紀錄
+ * @dependencies ViolationService
+ */
 import { Request, Response } from "express";
 
 import ViolationService from "../services/violation/violation.service";

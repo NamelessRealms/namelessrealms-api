@@ -1,3 +1,8 @@
+/**
+ * @file GetMcServerTpsInfo.ts
+ * @description Socket 事件：GET_MC_SERVER_TPS_INFO，查詢 Minecraft 伺服器 TPS 與玩家數（Discord 發起，mcServer 回應）
+ * @dependencies SocketIo, ISockerEvent
+ */
 import { Socket } from "socket.io";
 import SocketIo from "../SocketIo";
 import ISockerEvent, { ContainerType, IEventType, IGetMcServerTpsInfoDiscord, IGetMcServerTpsInfoMcServer } from "./ISockerEvent";

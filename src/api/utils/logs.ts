@@ -1,3 +1,12 @@
+/**
+ * @file logs.ts
+ * @description 帶有 ANSI 顏色標籤的靜態日誌工具，輸出包含時間戳記的 INFO / WARN / ERROR 訊息
+ * @methods
+ *   - info: 輸出綠色 INFO 層級日誌
+ *   - warn: 輸出黃色 WARN 層級日誌
+ *   - error: 輸出紅色 ERROR 層級日誌
+ * @dependencies dates
+ */
 import Dates from "./dates";
 
 const date: Dates = new Dates();

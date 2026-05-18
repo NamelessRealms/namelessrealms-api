@@ -1,3 +1,12 @@
+/**
+ * @file SocketIo.ts
+ * @description Socket.IO 伺服器管理類別，維護各客戶端類型（Discord / Panel / mcServer）的連線 Map 並派發事件
+ * @methods
+ *   - listeners: 建立 Socket.IO 伺服器、驗證連線 JWT 並註冊所有事件處理器
+ *   - getSocket: 依 clientType 與 clientId 查詢已連線的 Socket 實例
+ * @dependencies socket.io, http, AuthJwtVerify, 所有 socket event 類別
+ * @notes _containers 為靜態 Map，伺服器重啟後清空；斷線時自動從 Map 移除
+ */
 import { Server, Socket } from "socket.io";
 import * as http from "http";
 import SocketEvent from "./events/SocketEvent";

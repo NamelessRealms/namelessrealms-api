@@ -1,3 +1,12 @@
+/**
+ * @file s3.ts
+ * @description MinIO / S3 相容儲存的上傳工具，回傳 path-style 公開 URL
+ * @methods
+ *   - uploadToS3: 上傳 Buffer 至指定 key 並回傳可存取的 URL
+ *   - getExtFromMime: 依 MIME type 回傳對應副檔名
+ * @dependencies @aws-sdk/client-s3
+ * @notes 使用 forcePathStyle = true 以相容 MinIO；endpoint 與認證由環境變數提供
+ */
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import path from "path";
 

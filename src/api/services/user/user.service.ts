@@ -1,3 +1,13 @@
+/**
+ * @file user.service.ts
+ * @description 使用者相關資料庫操作層，含 Discord-Minecraft 帳號連結、玩家角色查詢與後台使用者管理
+ * @methods
+ *   - getAllUserLink / createUserLink / getUserLink: 管理 user_link 連結表
+ *   - getPlayerRole: 組合贊助與連結狀態回傳玩家角色資訊
+ *   - getPanelUsers / getPanelUser: 查詢後台使用者角色
+ *   - linkMinecraftAccount / getLinkedMinecraftAccount: 操作 minecraft_accounts 表
+ * @dependencies mysql, Sql utility
+ */
 import ICreateSql from "../../../interface/Sql/ICreateSql";
 import IUserLink from "../../../interface/user/IUserLink";
 import IMinecraftAccount from "../../../interface/user/IMinecraftAccount";

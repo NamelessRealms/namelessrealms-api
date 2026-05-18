@@ -1,3 +1,11 @@
+/**
+ * @file IRoutes.ts
+ * @description 所有路由類別的抽象基底類別，初始化 Router 並提供共用的驗證中介層實例
+ * @methods
+ *   - constructor: 建立 Router、載入路由，並將 Router 掛載至 app
+ *   - _loadRoutes: 由子類別實作，定義各自的路由規則
+ * @dependencies express, AuthJwtVerify, VerifyApiKey
+ */
 import { Router, Application } from "express";
 import AuthJwtVerify from "../middlewares/authJwtVerify";
 import { VerifyApiKey } from "../middlewares/verifyApiKey";

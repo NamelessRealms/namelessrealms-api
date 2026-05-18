@@ -1,3 +1,10 @@
+/**
+ * @file error.middleware.ts
+ * @description 全域 Express 錯誤處理中介層，區分 AppError（可操作性錯誤）與未預期錯誤並回傳標準 JSON 格式
+ * @methods errorMiddleware - 統一格式化並回應所有路由拋出的錯誤
+ * @dependencies AppError, Logs
+ * @notes 必須掛載在所有路由之後才能捕捉路由錯誤
+ */
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../utils/response/AppError";
 import Logs from "../utils/logs";

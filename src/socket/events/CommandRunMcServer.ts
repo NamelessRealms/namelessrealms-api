@@ -1,3 +1,8 @@
+/**
+ * @file CommandRunMcServer.ts
+ * @description Socket 事件：COMMAND_RUN_MC_SERVER，雙向轉發 Minecraft 伺服器指令（Discord → mcServer 或反向）
+ * @dependencies SocketIo, ISockerEvent
+ */
 import { Socket } from "socket.io";
 import SocketIo from "../SocketIo";
 import ISockerEvent, { ContainerType, ICommandRunMcServerDiscord, IEventType } from "./ISockerEvent";

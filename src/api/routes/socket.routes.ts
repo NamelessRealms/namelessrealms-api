@@ -1,3 +1,8 @@
+/**
+ * @file socket.routes.ts
+ * @description Socket 路由（前綴 /socket）：透過 HTTP 觸發 Socket.IO 事件廣播
+ * @dependencies IRoutes
+ */
 import { Application } from "express";
 
 import IRoutes from "./IRoutes";

@@ -1,3 +1,9 @@
+/**
+ * @file verifyRequestParameter.ts
+ * @description 驗證請求體是否包含必要屬性，支援單筆物件或陣列形式
+ * @methods
+ *   - verify: 檢查請求體（或陣列中每筆）是否包含所有必要 property
+ */
 export default class VerifyRequestParameter {
 
     private static _verifyParameterMethod<T>(body: T, hasProperty: Array<string>): boolean {

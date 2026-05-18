@@ -1,3 +1,8 @@
+/**
+ * @file mods.routes.ts
+ * @description Mod 路由（前綴 /mods）：批量查詢、批量檔案查詢與單一 Mod 檔案查詢
+ * @dependencies ModsController, IRoutes
+ */
 import { Application, Request, Response } from "express";
 import ModsController from "../controllers/mods.controller";
 import IRoutes from "./IRoutes";

@@ -1,3 +1,12 @@
+/**
+ * @file verifyApiKey.ts
+ * @description API Key 驗證中介層，支援純 API Key 驗證或 API Key / JWT 二擇一的彈性驗證
+ * @methods
+ *   - verify: 僅接受 x-api-key header 的請求
+ *   - verifyOrJwt: 優先驗證 JWT，若無 JWT 則回退至 API Key 驗證
+ * @dependencies mysql2, jsonwebtoken, AppError, config.service
+ * @notes JWT 存在但無效時不會回退至 API Key，以避免安全歧義
+ */
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../utils/response/AppError";
 import Mysql from "../utils/mysql";

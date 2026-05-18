@@ -1,3 +1,12 @@
+/**
+ * @file mods.controller.ts
+ * @description 處理 CurseForge Mod 資源查詢的 HTTP 請求
+ * @methods
+ *   - getMod: 取得單一 Mod 檔案資訊
+ *   - getMods: 批量取得多個 Mod 資訊
+ *   - getModFiles: 批量取得多個 Mod 檔案資訊
+ * @dependencies ModsService, VerifyRequestParameter, AppError
+ */
 import { Request, Response } from "express";
 import ModsService from "../services/mods/mods.service";
 import VerifyRequestParameter from "../utils/verify/verifyRequestParameter";

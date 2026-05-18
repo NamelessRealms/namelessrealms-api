@@ -1,4 +1,9 @@
-
+/**
+ * @file utils.ts
+ * @description 通用工具類別
+ * @methods
+ *   - isVersion: 比較兩個語意版本字串，回傳是否需要升級
+ */
 export default class Utils {
 
     public static isVersion(currVer: string, promoteVer: string): boolean {

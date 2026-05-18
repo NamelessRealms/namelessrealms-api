@@ -1,3 +1,12 @@
+/**
+ * @file app.ts
+ * @description Express 應用程式核心類別，負責初始化中介層、路由、Socket.IO 及 HTTP 伺服器
+ * @methods
+ *   - constructor: 初始化 SSL、Express、中介層與路由
+ *   - listen: 啟動 HTTP 伺服器並綁定 Socket.IO
+ * @dependencies express, helmet, morgan, cors, socket.io, swagger-ui-express
+ * @notes 全域錯誤處理 errorMiddleware 必須放在所有路由之後
+ */
 import express from "express";
 import path from "path";
 import { config } from "./config/config.service";

@@ -1,3 +1,11 @@
+/**
+ * @file mysql.ts
+ * @description MySQL 連線池的靜態包裝器，在應用程式啟動時建立連線並提供全域存取
+ * @methods
+ *   - connect: 建立 mysql2 連線池
+ *   - getPool: 取得連線池實例（未連線時拋出例外）
+ * @dependencies mysql2/promise, config.service
+ */
 import { createPool, Pool } from "mysql2/promise";
 import Logs from "./logs";
 import { config } from "../../config/config.service";

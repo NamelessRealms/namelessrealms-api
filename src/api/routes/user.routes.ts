@@ -1,3 +1,8 @@
+/**
+ * @file user.routes.ts
+ * @description 使用者路由（前綴 /user）：帳號連結、玩家角色、後台使用者、Minecraft 帳號連結
+ * @dependencies UserController, IRoutes
+ */
 import { Application, Request, Response } from "express";
 
 import IRoutes from "./IRoutes";

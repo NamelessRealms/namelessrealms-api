@@ -1,3 +1,12 @@
+/**
+ * @file mods.service.ts
+ * @description 透過 CurseForge API 查詢 Mod 資訊，支援單一檔案、批量 Mod 與批量檔案查詢
+ * @methods
+ *   - getMod: 查詢單一 Mod 的特定版本檔案
+ *   - getMods: 批量查詢多個 Mod 資訊
+ *   - getModFiles: 批量查詢多個 Mod 檔案資訊
+ * @dependencies got, config.service（CurseForge API Key）
+ */
 import got from "got";
 import { config } from "../../../config/config.service";
 

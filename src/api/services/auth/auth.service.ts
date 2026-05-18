@@ -1,3 +1,15 @@
+/**
+ * @file auth.service.ts
+ * @description 認證核心邏輯，包含密碼驗證（支援 MD5 → Argon2 Lazy Migration）、JWT 簽發、用戶註冊與 Refresh Token 流程
+ * @methods
+ *   - verify: OAuth2 密碼授權驗證並回傳 Access / Refresh Token
+ *   - hashPassword: Argon2 密碼雜湊
+ *   - generateAndSaveCode: 產生並發送信箱驗證碼
+ *   - registerUser: 驗證碼驗證後建立新用戶帳號
+ *   - refreshAccessToken: 以 Refresh Token 換取新的 Access Token
+ * @dependencies crypto, jsonwebtoken, argon2, mysql, MailService, AppError
+ * @notes Lazy Migration：舊 MD5 密碼在首次登入成功後自動升級為 Argon2
+ */
 import * as crypto from "crypto";
 import * as jwt from "jsonwebtoken";
 import uniqid from "uniqid";
@@ -16,11 +28,11 @@ import { AppError } from "../../utils/response/AppError";
 export default class AuthService {
   private _mailService = new MailService();
   /**
+   * OAuth2 密碼授權驗證，支援 MD5 → Argon2 Lazy Migration，成功後回傳 Access / Refresh Token
    *
-   *
-   * @param {*} verifyData
-   * @return {*}  {Promise<{ tokenCode: string, username: string, role: string[] }>}
-   * @memberof AuthService
+   * @param verifyData - 包含 grant_type、username、password 的授權資料
+   * @returns Access Token、Refresh Token、使用者名稱與角色列表
+   * @throws AppError 若授權類型不符、帳號不存在或密碼錯誤
    */
   public async verify(
     verifyData: any,
@@ -242,6 +254,13 @@ export default class AuthService {
     }
   }
 
+  /**
+   * 以 Refresh Token 換取新的 Access Token 與 Refresh Token
+   *
+   * @param refreshToken - 有效的 Refresh Token
+   * @returns 新的 Access Token、Refresh Token、使用者名稱與角色
+   * @throws AppError 若 Refresh Token 無效、過期或對應用戶不存在
+   */
   public async refreshAccessToken(refreshToken: string): Promise<{
     accessToken: string;
     refreshToken: string;

@@ -1,3 +1,10 @@
+/**
+ * @file mail.service.ts
+ * @description 透過 SMTP 發送系統郵件，目前支援發送信箱驗證碼
+ * @methods
+ *   - sendVerificationCode: 發送含 6 位數驗證碼的 HTML 郵件
+ * @dependencies nodemailer, config.service
+ */
 import nodemailer from "nodemailer";
 import { config } from "../../config/config.service";
 import Logs from "../utils/logs";

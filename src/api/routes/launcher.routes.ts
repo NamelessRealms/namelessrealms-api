@@ -1,3 +1,8 @@
+/**
+ * @file launcher.routes.ts
+ * @description Launcher V1 路由（前綴 /launcher）：資產設定讀取、頁面設定讀寫與自動更新重導向
+ * @dependencies LauncherController, IRoutes
+ */
 import { Application, Request, Response } from "express";
 
 import LauncherController from "../controllers/launcher.controller";

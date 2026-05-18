@@ -1,3 +1,15 @@
+/**
+ * @file server.service.ts
+ * @description 社群伺服器的資料庫操作層，含名稱衝突檢查、CRUD 與媒體 URL upsert
+ * @methods
+ *   - isNameTaken / isNameTakenByOther: 檢查伺服器名稱是否已被使用
+ *   - createServer: 新增伺服器紀錄
+ *   - getAllServers / getServerById: 查詢伺服器列表與單筆資料（包含媒體 URL）
+ *   - updateServer: 更新伺服器基本資訊
+ *   - upsertServerMedia: 以 ON DUPLICATE KEY UPDATE 更新 icon 或 background URL
+ * @dependencies mysql2
+ * @notes tags 欄位以 JSON 字串儲存於資料庫，讀取時自動反序列化
+ */
 import Mysql from "../../utils/mysql";
 
 export interface ServerSettings {

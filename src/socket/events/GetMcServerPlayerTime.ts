@@ -1,3 +1,8 @@
+/**
+ * @file GetMcServerPlayerTime.ts
+ * @description Socket 事件：GET_MC_SERVER_PLAYER_TIME，查詢指定玩家的遊玩時間（Discord 發起，mcServer 回應）
+ * @dependencies SocketIo, ISockerEvent
+ */
 import { Socket } from "socket.io";
 import SocketIo from "../SocketIo";
 import ISockerEvent, { ContainerType, IEventType, IGetMcServerPlayerTimeDiscord, IGetMcServerPlayerTimeMcServer } from "./ISockerEvent";

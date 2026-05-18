@@ -1,3 +1,8 @@
+/**
+ * @file violation.routes.ts
+ * @description 違規路由（前綴 /violation）：GET /user/:id 查詢違規紀錄
+ * @dependencies ViolationController, IRoutes
+ */
 import { Application, Request, Response } from "express";
 
 import ViolationController from "../controllers/violation.controller";

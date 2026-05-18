@@ -1,3 +1,10 @@
+/**
+ * @file SocketEvent.ts
+ * @description Socket 事件批量註冊器，將 ISockerEvent 實作陣列綁定至指定 Socket 連線
+ * @methods
+ *   - register: 迭代事件類別陣列並呼叫 socket.on 綁定各事件
+ * @dependencies socket.io, ISockerEvent
+ */
 import { Socket } from "socket.io";
 import Logs from "../../api/utils/logs";
 import { ProxyType } from "../SocketIo";

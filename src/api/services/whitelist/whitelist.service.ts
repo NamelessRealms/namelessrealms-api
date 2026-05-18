@@ -1,3 +1,13 @@
+/**
+ * @file whitelist.service.ts
+ * @description 白名單系統的資料庫操作層，管理待驗證、人工驗證、伺服器白名單與 TPME 驗證四種清單
+ * @methods
+ *   - createAwaitVerify / getAwaitVerify / deleteAwaitVerify: 待驗證白名單 CRUD
+ *   - getAllManualVerify / createManualVerify / getManualVerify / getManualVerifyCIdMId / deleteManualVerify: 人工驗證 CRUD
+ *   - getAllServerWhitelist / createServerWhitelist / getServerWhitelist / getServerWhitelistServerId / deleteServerWhitelist: 伺服器白名單 CRUD
+ *   - createTpmeVerifyWhitelist / getAllTpmeVerifyWhitelist / deleteTpmeVerifyWhitelist: TPME 驗證 CRUD
+ * @dependencies mysql, Sql utility
+ */
 import ICreateSql from "../../../interface/Sql/ICreateSql";
 import IAwaitVerify from "../../../interface/whitelist/IAwaitVerify";
 import IManualVerify from "../../../interface/whitelist/IManualVerify";

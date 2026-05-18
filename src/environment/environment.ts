@@ -1,3 +1,8 @@
+/**
+ * @file environment.ts
+ * @description 依據 NODE_ENV 合併 common 與對應環境的設定物件並匯出
+ * @dependencies environment.common, environment.dev, environment.prod
+ */
 import { environment as commonEnv } from "./environment.common";
 import { environment as prodEnv } from "./environment.prod";
 import { environment as devEnv } from "./environment.dev";

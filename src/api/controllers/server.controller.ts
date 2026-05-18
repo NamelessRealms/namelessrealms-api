@@ -1,3 +1,15 @@
+/**
+ * @file server.controller.ts
+ * @description 處理社群伺服器 CRUD 與媒體上傳的 HTTP 請求
+ * @methods
+ *   - postServer: 建立新伺服器
+ *   - getServers: 取得所有伺服器列表（過濾 owner_user_id）
+ *   - getServer: 取得單一伺服器資訊
+ *   - patchServer: 更新伺服器設定（需為擁有者）
+ *   - uploadServerMedia: 上傳伺服器 icon 或 background 至 S3/MinIO
+ * @dependencies ServerService, s3 utils
+ * @notes 回傳給前端時會移除 owner_user_id 欄位以保護隱私
+ */
 import { Request, Response } from "express";
 import ServerService from "../services/server/server.service";
 import { uploadToS3, getExtFromMime } from "../utils/s3/s3";

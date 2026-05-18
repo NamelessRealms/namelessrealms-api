@@ -1,3 +1,13 @@
+/**
+ * @file whitelist.controllers.ts
+ * @description 處理白名單相關 CRUD 的 HTTP 請求，包含待驗證、人工驗證、伺服器白名單與 TPME 驗證
+ * @methods
+ *   - createAwaitVerify / getAwaitVerify / deleteAwaitVerify: 待驗證清單操作
+ *   - getAllManualVerify / createManualVerify / getManualVerify / getManualVerifyCIdMId / deleteManualVerify: 人工驗證操作
+ *   - getAllServerWhitelist / createServerWhitelist / getServerWhitelist / getServerWhitelistServerId / deleteServerWhitelist: 伺服器白名單操作
+ *   - createTpmeVerifyWhitelist / getAllTpmeVerifyWhitelist / deleteTpmeVerifyWhitelist: TPME 驗證操作
+ * @dependencies WhitelistService, VerifyRequest, VerifyRequestParameter, AppError
+ */
 import { Request, Response } from "express";
 
 import IAwaitVerify from "../../interface/whitelist/IAwaitVerify";

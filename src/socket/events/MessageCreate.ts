@@ -1,3 +1,8 @@
+/**
+ * @file MessageCreate.ts
+ * @description Socket 事件：MESSAGE_CREATE，在 Discord 與 Minecraft 伺服器之間雙向轉發聊天訊息
+ * @dependencies SocketIo, ISockerEvent
+ */
 import { Socket } from "socket.io";
 import SocketIo from "../SocketIo";
 import ISockerEvent, { ContainerType, IEventType, IMessageDiscord, IMessageMcServer } from "./ISockerEvent";

@@ -1,3 +1,11 @@
+/**
+ * @file replyError.ts
+ * @description 舊式錯誤回應工具（已被 errorMiddleware + AppError 取代，保留供向下相容）
+ * @methods
+ *   - replyServerError: 回傳 500 伺服器錯誤
+ *   - replyParameterError: 回傳 400 參數錯誤
+ * @dependencies express
+ */
 import { Response } from "express";
 
 export default class ReplyError {

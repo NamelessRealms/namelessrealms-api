@@ -1,3 +1,12 @@
+/**
+ * @file config.service.ts
+ * @description 從環境變數載入並驗證所有必要設定的單例服務，初始化失敗時直接拋出例外
+ * @methods
+ *   - getInstance: 取得單例實例
+ *   - env / isDevelopment / port / db / jwt / mail / ssl / curseforgeKey / webhooksErrorUrl: 設定讀取器
+ * @dependencies dotenv
+ * @notes 若必要環境變數缺少，伺服器啟動時會立即終止
+ */
 import "dotenv/config";
 
 interface IDatabaseConfig {

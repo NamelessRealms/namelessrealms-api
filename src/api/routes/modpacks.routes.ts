@@ -1,3 +1,8 @@
+/**
+ * @file modpacks.routes.ts
+ * @description Modpack 路由（前綴 /modpacks）：單一 Modpack 檔案查詢（無需驗證）
+ * @dependencies ModsController, IRoutes
+ */
 import { Application, Request, Response } from "express";
 import ModsController from "../controllers/mods.controller";
 

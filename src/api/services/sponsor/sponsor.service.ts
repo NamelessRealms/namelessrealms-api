@@ -1,3 +1,14 @@
+/**
+ * @file sponsor.service.ts
+ * @description 贊助者紀錄的資料庫操作層，支援查詢、新增、累加金額與刪除
+ * @methods
+ *   - getAllSponsorUser: 取得所有贊助者
+ *   - createSponsorUser: 新增贊助者（支援單筆或陣列）
+ *   - patchSponsorUser: 累加贊助金額（非覆蓋）
+ *   - deleteSponsorUser: 刪除贊助紀錄
+ *   - getSponsorUser: 依 UUID 查詢贊助者
+ * @dependencies mysql, Sql utility
+ */
 import ISponsorUser from "../../../interface/sponsor/ISponsorUser";
 import ICreateSql from "../../../interface/Sql/ICreateSql";
 import Sql from "../../utils/database/sql";

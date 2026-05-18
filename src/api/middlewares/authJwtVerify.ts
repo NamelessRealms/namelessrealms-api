@@ -1,3 +1,12 @@
+/**
+ * @file authJwtVerify.ts
+ * @description JWT 驗證中介層，處理 HTTP 請求驗證、Socket.IO 連線驗證與 admin 權限控管
+ * @methods
+ *   - verifyToken: 驗證 HTTP 請求的 Bearer JWT
+ *   - socketVerifyToken: 驗證 Socket.IO 連線的 JWT
+ *   - accessControl: 檢查使用者是否具備 admin 以上角色
+ * @dependencies jsonwebtoken, socket.io, AppError, config.service
+ */
 import { Request, Response, NextFunction } from "express";
 
 import * as jwt from "jsonwebtoken";
