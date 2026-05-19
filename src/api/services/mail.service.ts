@@ -7,7 +7,7 @@
  */
 import nodemailer from "nodemailer";
 import { config } from "../../config/config.service";
-import Logs from "../utils/logs";
+import logger from "../utils/logger";
 
 export default class MailService {
   private _transporter: nodemailer.Transporter;
@@ -40,9 +40,9 @@ export default class MailService {
 
     try {
       await this._transporter.sendMail(mailOptions);
-      Logs.info(`Verification code sent to ${email}`);
+      logger.info(`Verification code sent to ${email}`);
     } catch (error) {
-      Logs.error(`Failed to send email to ${email}: ${error}`);
+      logger.error(`Failed to send email to ${email}: ${error}`);
       throw new Error("無法發送驗證碼郵件，請稍後再試。");
     }
   }

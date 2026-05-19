@@ -4,13 +4,12 @@
  * @methods
  *   - constructor: 初始化 SSL、Express、中介層與路由
  *   - listen: 啟動 HTTP 伺服器並綁定 Socket.IO
- * @dependencies express, helmet, morgan, cors, socket.io, swagger-ui-express
+ * @dependencies express, helmet, pino-http, cors, socket.io, swagger-ui-express
  * @notes 全域錯誤處理 errorMiddleware 必須放在所有路由之後
  */
 import express from "express";
 import path from "path";
 import { config } from "./config/config.service";
-const morgan = require("morgan");
 import helmet from "helmet";
 const cookieParser = require("cookie-parser");
 import fs from "fs-extra";
@@ -35,7 +34,8 @@ import LauncherV2Router from "./api/routes/launcherV2.routes";
 import ModpacksRoutes from "./api/routes/modpacks.routes";
 
 import Mysql from "./api/utils/mysql";
-import Logs from "./api/utils/logs";
+import logger from "./api/utils/logger";
+import pinoHttp from "pino-http";
 
 // environment
 import { environment } from "./environment/environment";
@@ -50,24 +50,6 @@ import { swaggerSpec } from "./config/swagger";
 
 export default class App {
   private _app: express.Application;
-  private _morganFormat =
-    '[:date[iso]] :remote-addr - :remote-user ":method :url :status :response-time ms';
-  // private _mySQLStore = require("express-mysql-session")(session);
-
-  // private _sessionOptions = {
-  //     secret: "@@!!@@",
-  //     resave: false,
-  //     saveUninitialized: true,
-  //     store: new this._mySQLStore({
-  //         host: process.env.MYSQL_HOST,
-  //         user: process.env.MYSQL_USER,
-  //         password: process.env.MYSQL_PASSWORD,
-  //         database: process.env.MYSQL_DATABASE
-  //     })
-  // }
-
-  // private _credentials: { key: string, cert: string } | null = null;
-
   private _privateKey: string | null = null;
   private _certificate: string | null = null;
   private _io: socketIo.Server | null = null;
@@ -87,8 +69,8 @@ export default class App {
   }
 
   private _init(): void {
-    Logs.info(`Api Service start model: ${config.env}`);
-    Logs.info(`Api Service Version: ${environment.api_version}`);
+    logger.info(`Api Service start model: ${config.env}`);
+    logger.info(`Api Service Version: ${environment.api_version}`);
     Mysql.connect();
     InteractionsService.initLoopPings();
   }
@@ -112,12 +94,24 @@ export default class App {
     );
 
     this._app.use(helmet());
-    this._app.use(morgan(config.isDevelopment ? "dev" : this._morganFormat));
+    this._app.use(
+      pinoHttp({
+        logger,
+        customLogLevel(_req, res, err) {
+          if (err || res.statusCode >= 500) return "error";
+          if (res.statusCode >= 400) return "warn";
+          return "info";
+        },
+        serializers: {
+          req: (req) => ({ method: req.method, url: req.url }),
+          res: (res) => ({ status: res.statusCode }),
+        },
+      }),
+    );
     this._app.use(express.json({ limit: "10MB" }));
     // this._app.use(express.static(path.join(__dirname, "public")));
     this._app.use(express.urlencoded({ extended: true }));
     this._app.use(cookieParser());
-    // this._app.use(session(this._sessionOptions));
   }
 
   private _routes(): void {
@@ -148,7 +142,7 @@ export default class App {
     const httpServer = http.createServer(this._app);
 
     httpServer.listen(port, () => {
-      Logs.info("Http Api Service listening on PORT " + this._app.get("port"));
+      logger.info(`Http Api Service listening on PORT ${this._app.get("port")}`);
     });
 
     new SocketIo(httpServer).listeners();

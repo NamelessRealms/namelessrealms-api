@@ -6,7 +6,6 @@
  * @dependencies socket.io, ISockerEvent
  */
 import { Socket } from "socket.io";
-import Logs from "../../api/utils/logs";
 import { ProxyType } from "../SocketIo";
 import ISockerEvent, { ContainerType, IEventType } from "./ISockerEvent";
 

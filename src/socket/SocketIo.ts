@@ -10,7 +10,7 @@
 import { Server, Socket } from "socket.io";
 import * as http from "http";
 import SocketEvent from "./events/SocketEvent";
-import Logs from "../api/utils/logs";
+import logger from "../api/utils/logger";
 import MessageEvent from "./events/MessageCreate";
 import { ContainerType } from "./events/ISockerEvent";
 import GetMcServerPlayerTime from "./events/GetMcServerPlayerTime";
@@ -50,7 +50,7 @@ export default class SocketIo {
             const proxyType = socketConnection.handshake.query.proxyType as ProxyType;
             const proxy = proxyType === undefined ? "Client" : proxyType;
 
-            Logs.info("Socket Connection: " + socketConnection.id + " clientType: " + clientType + " clientId: " + clientId);
+            logger.info("Socket Connection: " + socketConnection.id + " clientType: " + clientType + " clientId: " + clientId);
 
             const socket = { clientId: clientId, socket: socketConnection };
 
@@ -67,7 +67,7 @@ export default class SocketIo {
                 if (clientTypeContainers === undefined) return;
                 clientTypeContainers = clientTypeContainers.filter((container) => container.socket.id !== socketConnection.id);
                 SocketIo._containers.set(clientType, clientTypeContainers);
-                Logs.info("Socket Disconnect: " + socketConnection.id + " clientType: " + clientType + " clientId: " + clientId);
+                logger.info("Socket Disconnect: " + socketConnection.id + " clientType: " + clientType + " clientId: " + clientId);
                 // console.log(SocketIo._containers);
             });
 

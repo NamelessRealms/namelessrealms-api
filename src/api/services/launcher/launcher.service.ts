@@ -10,7 +10,7 @@
  */
 import ICreateSql from "../../../interface/Sql/ICreateSql";
 import file from "../../utils/file/file";
-import Logs from "../../utils/logs";
+import logger from "../../utils/logger";
 import Mysql from "../../utils/mysql";
 import got from "got";
 

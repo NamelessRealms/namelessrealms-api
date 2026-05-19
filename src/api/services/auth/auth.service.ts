@@ -20,7 +20,7 @@ import Mysql from "../../utils/mysql";
 import { IUser } from "../../../interface/auth/IUser";
 import { RegisterDTO } from "../../../interface/auth/RegisterDTO";
 import { environment } from "../../../environment/environment";
-import Logs from "../../utils/logs";
+import logger from "../../utils/logger";
 import { config } from "../../../config/config.service";
 import MailService from "../mail.service";
 import { AppError } from "../../utils/response/AppError";
@@ -100,12 +100,12 @@ export default class AuthService {
           "UPDATE users SET password = ? WHERE `unique` = ?",
           [newArgon2Hash, user.unique],
         );
-        Logs.info(
+        logger.info(
           `User [${user.username}] password has been migrated to Argon2.`,
         );
       } catch (upgradeError) {
         // 升級失敗僅記錄日誌，不影響本次登入
-        Logs.error(
+        logger.error(
           `Lazy migration failed for user [${user.username}]: ${upgradeError}`,
         );
       }

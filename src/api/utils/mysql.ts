@@ -7,7 +7,6 @@
  * @dependencies mysql2/promise, config.service
  */
 import { createPool, Pool } from "mysql2/promise";
-import Logs from "./logs";
 import { config } from "../../config/config.service";
 
 export default class Mysql {
