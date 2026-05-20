@@ -11,6 +11,7 @@
  * @notes tags 欄位以 JSON 字串儲存於資料庫，讀取時自動反序列化
  */
 import Mysql from "../../utils/mysql";
+import { Permission } from "../../utils/permissions";
 
 export interface ServerSettings {
   id: string;
@@ -46,9 +47,19 @@ export default class ServerService {
     ownerUserId: string
   ): Promise<{ id: string }> {
     const id = crypto.randomUUID();
-    await Mysql.getPool().query(
+    const roleId = crypto.randomUUID();
+    const pool = Mysql.getPool();
+    await pool.query(
       "INSERT INTO servers (id, name, description, tags, owner_user_id) VALUES (?, ?, ?, ?, ?)",
       [id, name, description, JSON.stringify(tags), ownerUserId]
+    );
+    await pool.query(
+      "INSERT INTO server_roles (id, server_id, name, color, permissions, position) VALUES (?, ?, '管理員', '#99aab5', ?, 1)",
+      [roleId, id, Permission.ADMINISTRATOR]
+    );
+    await pool.query(
+      "INSERT INTO server_members (server_id, user_id, role_id) VALUES (?, ?, ?)",
+      [id, ownerUserId, roleId]
     );
     return { id };
   }

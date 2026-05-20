@@ -29,7 +29,7 @@ export default class ServerController {
       response.status(409).json({ code: "Conflict", message: "此伺服器名稱已被使用" });
       return;
     }
-    const ownerUserId: string = (request as any).user?.id ?? "unknown";
+    const ownerUserId: string = (request as any).user?.sub ?? "";
     const result = await this._serverService.createServer(trimmedName, description, tags, ownerUserId);
     response.status(201).json({ id: result.id, name: trimmedName });
   }
@@ -66,12 +66,6 @@ export default class ServerController {
       return;
     }
 
-    const requesterId: string = (request as any).user?.id ?? "";
-    if (server.owner_user_id !== requesterId) {
-      response.status(403).json({ message: "無權限修改此伺服器" });
-      return;
-    }
-
     if (trimmedName !== server.name) {
       const taken = await this._serverService.isNameTakenByOther(trimmedName, serverId);
       if (taken) {
@@ -94,12 +88,6 @@ export default class ServerController {
     const server = await this._serverService.getServerById(serverId);
     if (!server) {
       response.status(404).json({ message: "找不到該伺服器" });
-      return;
-    }
-
-    const requesterId: string = (request as any).user?.id ?? "";
-    if (server.owner_user_id !== requesterId) {
-      response.status(403).json({ message: "無權限修改此伺服器" });
       return;
     }
 
