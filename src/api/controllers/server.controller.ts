@@ -12,7 +12,7 @@
  */
 import { Request, Response } from "express";
 import ServerService from "../services/server/server.service";
-import { uploadToS3, getExtFromMime } from "../utils/s3/s3";
+import { uploadToS3, getExtFromMime, deleteFromS3, keyFromUrl } from "../utils/s3/s3";
 
 export default class ServerController {
   private _serverService = new ServerService();
@@ -97,11 +97,40 @@ export default class ServerController {
       return;
     }
 
+    const existingUrl = mediaType === "icon" ? server.icon_url : server.background_url;
+    if (existingUrl) {
+      const oldKey = keyFromUrl(existingUrl);
+      if (oldKey) await deleteFromS3(oldKey);
+    }
+
     const ext = getExtFromMime(file.mimetype);
     const key = `servers/${serverId}/${mediaType}.${ext}`;
     const url = await uploadToS3(key, file.buffer, file.mimetype);
 
     await this._serverService.upsertServerMedia(serverId, mediaType, url);
     response.json({ url });
+  }
+
+  public async deleteServerMedia(
+    request: Request,
+    response: Response,
+    mediaType: "icon" | "background"
+  ): Promise<void> {
+    const serverId = request.params.serverId as string;
+
+    const server = await this._serverService.getServerById(serverId);
+    if (!server) {
+      response.status(404).json({ message: "找不到該伺服器" });
+      return;
+    }
+
+    const mediaUrl = mediaType === "icon" ? server.icon_url : server.background_url;
+    if (mediaUrl) {
+      const key = keyFromUrl(mediaUrl);
+      if (key) await deleteFromS3(key);
+    }
+
+    await this._serverService.deleteServerMedia(serverId, mediaType);
+    response.status(204).send();
   }
 }

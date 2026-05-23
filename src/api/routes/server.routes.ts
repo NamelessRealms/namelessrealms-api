@@ -65,6 +65,13 @@ export default class ServerRouter extends IRoutes {
         asyncHandler((req: Request, res: Response) =>
           this._serverController.uploadServerMedia(req, res, "icon")
         )
+      )
+      .delete(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) =>
+          this._serverController.deleteServerMedia(req, res, "icon")
+        )
       );
 
     this._routers
@@ -75,6 +82,13 @@ export default class ServerRouter extends IRoutes {
         upload.single("file") as any,
         asyncHandler((req: Request, res: Response) =>
           this._serverController.uploadServerMedia(req, res, "background")
+        )
+      )
+      .delete(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) =>
+          this._serverController.deleteServerMedia(req, res, "background")
         )
       );
 

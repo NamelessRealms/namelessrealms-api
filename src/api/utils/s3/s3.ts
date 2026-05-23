@@ -5,12 +5,14 @@
  *   - uploadToS3: 上傳 Buffer 至指定 key 並回傳可存取的 URL
  *   - getExtFromMime: 依 MIME type 回傳對應副檔名
  * @dependencies @aws-sdk/client-s3
- * @notes 使用 forcePathStyle = true 以相容 MinIO；endpoint 與認證由環境變數提供
+ * @notes 使用 forcePathStyle = true 以相容 MinIO；endpoint 與認證由環境變數提供；
+ *        MINIO_PUBLIC_ENDPOINT 用於組成外網可存取的 URL
  */
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import path from "path";
 
 const endpoint = process.env.MINIO_ENDPOINT!;
+const publicEndpoint = process.env.MINIO_PUBLIC_ENDPOINT;
 const bucket = process.env.MINIO_BUCKET!;
 
 const s3 = new S3Client({
@@ -34,10 +36,37 @@ export async function uploadToS3(
       Key: key,
       Body: buffer,
       ContentType: contentType,
+      CacheControl: "no-cache",
     })
   );
-  // MinIO path-style URL: http(s)://host:port/bucket/key
-  return `${endpoint}/${bucket}/${key}`;
+  return `${publicEndpoint}/${bucket}/${key}?v=${Date.now()}`;
+}
+
+/**
+ * 刪除 S3/MinIO 上的指定物件
+ *
+ * @param key - 要刪除的物件 key（例如 `servers/{id}/icon.jpg`）
+ */
+export async function deleteFromS3(key: string): Promise<void> {
+  await s3.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    })
+  );
+}
+
+/**
+ * 從公開 URL 反推 S3 物件 key；無法解析時回傳 null
+ *
+ * @param url - 由 uploadToS3 回傳的公開 URL
+ */
+export function keyFromUrl(url: string): string | null {
+  if (!publicEndpoint) return null;
+  const prefix = `${publicEndpoint}/${bucket}/`;
+  const clean = url.split("?")[0];
+  if (!clean.startsWith(prefix)) return null;
+  return clean.slice(prefix.length);
 }
 
 export function getExtFromMime(contentType: string): string {

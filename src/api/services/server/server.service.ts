@@ -123,6 +123,22 @@ export default class ServerService {
     );
   }
 
+  /**
+   * 刪除伺服器媒體紀錄（從 server_media 表移除）
+   *
+   * @param serverId - 伺服器 ID
+   * @param mediaType - "icon" 或 "background"
+   */
+  public async deleteServerMedia(
+    serverId: string,
+    mediaType: "icon" | "background"
+  ): Promise<void> {
+    await Mysql.getPool().query(
+      "DELETE FROM server_media WHERE server_id = ? AND media_type = ?",
+      [serverId, mediaType]
+    );
+  }
+
   public async upsertServerMedia(
     serverId: string,
     mediaType: "icon" | "background",
