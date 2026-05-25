@@ -8,6 +8,7 @@ import { Application, Request, Response } from "express";
 import ServerController from "../controllers/server.controller";
 import ServerRoleController from "../controllers/server-role.controller";
 import ServerMemberController from "../controllers/server-member.controller";
+import * as modpackController from "../controllers/server-modpack.controller";
 import IRoutes from "./IRoutes";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { requirePermission } from "../middlewares/requirePermission";
@@ -174,6 +175,76 @@ export default class ServerRouter extends IRoutes {
         asyncHandler((req: Request, res: Response) =>
           this._memberController.removeMember(req, res)
         )
+      );
+
+    // --- 模組包版本管理路由 ---
+
+    // 注意：import 路由必須在 /:versionId 之前，避免被誤解析成 versionId
+    this._routers
+      .route("/:serverId/modpack-versions/import")
+      .post(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        upload.single("file") as any,
+        asyncHandler((req: Request, res: Response) =>
+          modpackController.importVersion(req, res)
+        )
+      );
+
+    this._routers
+      .route("/:serverId/modpack-versions")
+      .get(asyncHandler((req: Request, res: Response) => modpackController.getVersions(req, res)))
+      .post(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.createVersion(req, res))
+      );
+
+    this._routers
+      .route("/:serverId/modpack-versions/:versionId/activate")
+      .patch(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.activateVersion(req, res))
+      );
+
+    this._routers
+      .route("/:serverId/modpack-versions/:versionId/publish")
+      .post(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.publishVersion(req, res))
+      );
+
+    this._routers
+      .route("/:serverId/modpack-versions/:versionId/files")
+      .get(asyncHandler((req: Request, res: Response) => modpackController.getFiles(req, res)))
+      .post(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        upload.single("file") as any,
+        asyncHandler((req: Request, res: Response) => modpackController.addFile(req, res))
+      );
+
+    this._routers
+      .route("/:serverId/modpack-versions/:versionId/files/:fileId")
+      .delete(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.removeFile(req, res))
+      );
+
+    this._routers
+      .route("/:serverId/modpack-versions/:versionId")
+      .patch(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.updateVersion(req, res))
+      )
+      .delete(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.deleteVersion(req, res))
       );
   }
 }
