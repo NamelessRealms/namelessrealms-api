@@ -5,6 +5,5 @@
 .vscode
 .env
 yarn-error.log
-CLAUDE.md
 create_api_key.ts
 
