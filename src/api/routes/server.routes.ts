@@ -8,6 +8,7 @@ import { Application, Request, Response } from "express";
 import ServerController from "../controllers/server.controller";
 import ServerRoleController from "../controllers/server-role.controller";
 import ServerMemberController from "../controllers/server-member.controller";
+import ServerSubServerController from "../controllers/server-sub-server.controller";
 import * as modpackController from "../controllers/server-modpack.controller";
 import IRoutes from "./IRoutes";
 import { asyncHandler } from "../middlewares/asyncHandler";
@@ -20,6 +21,7 @@ export default class ServerRouter extends IRoutes {
   private _serverController = new ServerController();
   private _roleController = new ServerRoleController();
   private _memberController = new ServerMemberController();
+  private _subServerController = new ServerSubServerController();
 
   constructor(app: Application) {
     super(app, "/servers");
@@ -174,6 +176,54 @@ export default class ServerRouter extends IRoutes {
         requirePermission(Permission.MANAGE_MEMBERS),
         asyncHandler((req: Request, res: Response) =>
           this._memberController.removeMember(req, res)
+        )
+      );
+
+    // --- 子伺服器管理路由 ---
+
+    this._routers
+      .route("/:serverId/sub-servers")
+      .get(
+        asyncHandler((req: Request, res: Response) =>
+          this._subServerController.getSubServers(req, res)
+        )
+      )
+      .post(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) =>
+          this._subServerController.createSubServer(req, res)
+        )
+      );
+
+    // 子伺服器目前啟用的 modpack 版本（供啟動流程取 manifest）
+    this._routers
+      .route("/:serverId/sub-servers/:subServerId/active-modpack")
+      .get(
+        asyncHandler((req: Request, res: Response) =>
+          modpackController.getActiveModpackForSubServer(req, res)
+        )
+      );
+
+    this._routers
+      .route("/:serverId/sub-servers/:subServerId")
+      .get(
+        asyncHandler((req: Request, res: Response) =>
+          this._subServerController.getSubServer(req, res)
+        )
+      )
+      .patch(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) =>
+          this._subServerController.updateSubServer(req, res)
+        )
+      )
+      .delete(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) =>
+          this._subServerController.deleteSubServer(req, res)
         )
       );
 

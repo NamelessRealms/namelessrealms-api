@@ -8,12 +8,13 @@
  *   - server_modpack_files 表已廢棄，不再使用
  *
  * @methods
- *   - getVersions: 取得版本列表（含 file_count）
- *   - createVersion: 從零建立新版本（只傳 metadata）
- *   - importVersion: 匯入 CurseForge/Modrinth 模組包並解析檔案
+ *   - getVersions: 取得版本列表（含 file_count）；可用 ?subServerId 篩選
+ *   - createVersion: 從零建立新版本（只傳 metadata，可選綁定 sub_server_id）
+ *   - importVersion: 匯入 CurseForge/Modrinth 模組包並解析檔案（可選綁定 sub_server_id）
  *   - updateVersion: 更新版本 metadata
  *   - deleteVersion: 刪除版本（active 版本不可刪）
- *   - activateVersion: 設為目前版本（事務操作）
+ *   - activateVersion: 設為目前版本（is_active 以子伺服器為單位）
+ *   - getActiveModpackForSubServer: 取某子伺服器啟用中的版本（供啟動流程取 manifest）
  *   - publishVersion: 產生 manifest.json 上傳 S3 並清空 draft_files
  *   - getFiles: 取得版本的檔案列表（draft 從 JSON 欄位，published 從 S3 manifest）
  *   - addFile: 上傳單一檔案到版本（只允許 draft）
@@ -29,13 +30,20 @@ import ModsService from "../services/mods/mods.service";
 
 const modsService = new ModsService();
 
-/** 取得伺服器所有模組包版本（含每版本的檔案數量） */
+/** 取得伺服器所有模組包版本（含每版本的檔案數量）；可用 ?subServerId 篩選某子伺服器 */
 export async function getVersions(req: Request, res: Response): Promise<void> {
   const { serverId } = req.params;
-  const [rows]: any = await Mysql.getPool().query(
-    "SELECT * FROM server_modpack_versions WHERE server_id = ? ORDER BY created_at DESC",
-    [serverId]
-  );
+  const subServerId = req.query.subServerId as string | undefined;
+
+  const [rows]: any = subServerId
+    ? await Mysql.getPool().query(
+        "SELECT * FROM server_modpack_versions WHERE server_id = ? AND sub_server_id = ? ORDER BY created_at DESC",
+        [serverId, subServerId]
+      )
+    : await Mysql.getPool().query(
+        "SELECT * FROM server_modpack_versions WHERE server_id = ? ORDER BY created_at DESC",
+        [serverId]
+      );
   const versions = (rows as any[]).map(({ draft_files: _df, ...r }) => ({
     ...r,
     is_active: r.is_active === 1,
@@ -47,7 +55,7 @@ export async function getVersions(req: Request, res: Response): Promise<void> {
 /** 建立新的模組包版本（只含 metadata，status = draft） */
 export async function createVersion(req: Request, res: Response): Promise<void> {
   const { serverId } = req.params;
-  const { version_label, mc_version, modloader, modloader_version, notes } = req.body;
+  const { version_label, mc_version, modloader, modloader_version, notes, sub_server_id } = req.body;
 
   if (!version_label?.trim() || !mc_version?.trim() || !modloader?.trim()) {
     res.status(400).json({ message: "version_label、mc_version、modloader 為必填" });
@@ -57,9 +65,9 @@ export async function createVersion(req: Request, res: Response): Promise<void> 
   const id = crypto.randomUUID();
   await Mysql.getPool().query(
     `INSERT INTO server_modpack_versions
-       (id, server_id, version_label, mc_version, modloader, modloader_version, notes, draft_files, file_count)
-     VALUES (?, ?, ?, ?, ?, ?, ?, '[]', 0)`,
-    [id, serverId, version_label.trim(), mc_version.trim(), modloader, modloader_version ?? null, notes ?? null]
+       (id, server_id, sub_server_id, version_label, mc_version, modloader, modloader_version, notes, draft_files, file_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '[]', 0)`,
+    [id, serverId, sub_server_id ?? null, version_label.trim(), mc_version.trim(), modloader, modloader_version ?? null, notes ?? null]
   );
 
   const [rows]: any = await Mysql.getPool().query(
@@ -73,6 +81,7 @@ export async function createVersion(req: Request, res: Response): Promise<void> 
 /** 匯入 CurseForge zip 或 Modrinth mrpack，自動解析 metadata 與檔案 */
 export async function importVersion(req: Request, res: Response): Promise<void> {
   const { serverId } = req.params;
+  const { sub_server_id } = req.body;
 
   if (!req.file) {
     res.status(400).json({ message: "請上傳 .zip 或 .mrpack 檔案" });
@@ -209,9 +218,9 @@ export async function importVersion(req: Request, res: Response): Promise<void> 
 
   await Mysql.getPool().query(
     `INSERT INTO server_modpack_versions
-       (id, server_id, version_label, mc_version, modloader, modloader_version, draft_files, file_count)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [versionId, serverId, versionLabel, mcVersion, modloader, modloaderVersion,
+       (id, server_id, sub_server_id, version_label, mc_version, modloader, modloader_version, draft_files, file_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [versionId, serverId, sub_server_id ?? null, versionLabel, mcVersion, modloader, modloaderVersion,
       JSON.stringify(filesWithIds), filesWithIds.length]
   );
 
@@ -271,12 +280,12 @@ export async function deleteVersion(req: Request, res: Response): Promise<void> 
   res.status(204).send();
 }
 
-/** 設為目前版本（事務操作：先清空所有 is_active，再設此版本） */
+/** 設為目前版本（先清空同一子伺服器的 is_active，再設此版本；is_active 以子伺服器為單位） */
 export async function activateVersion(req: Request, res: Response): Promise<void> {
   const { serverId, versionId } = req.params;
 
   const [rows]: any = await Mysql.getPool().query(
-    "SELECT id, status FROM server_modpack_versions WHERE id = ? AND server_id = ?",
+    "SELECT id, status, sub_server_id FROM server_modpack_versions WHERE id = ? AND server_id = ?",
     [versionId, serverId]
   );
   if (!rows.length) { res.status(404).json({ message: "找不到該版本" }); return; }
@@ -286,9 +295,30 @@ export async function activateVersion(req: Request, res: Response): Promise<void
   }
 
   const pool = Mysql.getPool();
-  await pool.query("UPDATE server_modpack_versions SET is_active = 0 WHERE server_id = ?", [serverId]);
+  // <=> 為 NULL 安全等於：sub_server_id 為 NULL 的版本自成一組，不會與已指定子伺服器的版本互相清除
+  await pool.query(
+    "UPDATE server_modpack_versions SET is_active = 0 WHERE server_id = ? AND sub_server_id <=> ?",
+    [serverId, rows[0].sub_server_id]
+  );
   await pool.query("UPDATE server_modpack_versions SET is_active = 1 WHERE id = ?", [versionId]);
   res.json({ ok: true });
+}
+
+/** 取得某子伺服器目前啟用中的 modpack 版本（供啟動流程取 manifest）；無啟用版本時回 404 */
+export async function getActiveModpackForSubServer(req: Request, res: Response): Promise<void> {
+  const { serverId, subServerId } = req.params;
+
+  const [rows]: any = await Mysql.getPool().query(
+    "SELECT * FROM server_modpack_versions WHERE server_id = ? AND sub_server_id = ? AND is_active = 1 LIMIT 1",
+    [serverId, subServerId]
+  );
+  if (!rows.length) {
+    res.status(404).json({ message: "該子伺服器尚無啟用中的模組包版本" });
+    return;
+  }
+
+  const { draft_files: _df, ...row } = rows[0];
+  res.json({ ...row, is_active: true, file_count: Number(row.file_count) });
 }
 
 /** 發布版本：產生 manifest.json 並上傳 S3，更新 status 與 manifest_url，清空 draft_files */

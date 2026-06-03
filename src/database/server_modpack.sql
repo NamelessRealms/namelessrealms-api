@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS server_modpack_versions (
   id                VARCHAR(36)                                          NOT NULL PRIMARY KEY,
   server_id         VARCHAR(36)                                          NOT NULL,
+  -- 綁定的子伺服器；NULL = 尚未指定（品牌層舊資料）。is_active 以「每個子伺服器一個」為單位
+  sub_server_id     VARCHAR(36)                                          NULL,
   version_label     VARCHAR(100)                                         NOT NULL,
   mc_version        VARCHAR(20)                                          NOT NULL,
   modloader         ENUM('Vanilla','Forge','Fabric','NeoForge','Quilt')  NOT NULL,
@@ -20,6 +22,7 @@ CREATE TABLE IF NOT EXISTS server_modpack_versions (
 -- Migration（對已存在的資料庫執行一次）：
 -- ALTER TABLE server_modpack_versions ADD COLUMN draft_files MEDIUMTEXT NULL;
 -- ALTER TABLE server_modpack_versions ADD COLUMN file_count INT NOT NULL DEFAULT 0;
+-- ALTER TABLE server_modpack_versions ADD COLUMN sub_server_id VARCHAR(36) NULL AFTER server_id;
 --
 -- 把現有 draft 版本的檔案列搬進 JSON 欄位：
 -- UPDATE server_modpack_versions v
