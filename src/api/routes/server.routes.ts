@@ -59,6 +59,16 @@ export default class ServerRouter extends IRoutes {
         )
       );
 
+    // 取得呼叫者於該伺服器的有效權限（owner 回 ADMINISTRATOR）
+    this._routers
+      .route("/:serverId/me")
+      .get(
+        this._authJwtVerify.verifyToken,
+        asyncHandler((req: Request, res: Response) =>
+          this._serverController.getMyMembership(req, res)
+        )
+      );
+
     this._routers
       .route("/:serverId/icon")
       .post(
