@@ -41,6 +41,7 @@ import pinoHttp from "pino-http";
 import { environment } from "./environment/environment";
 import LauncherOldRouter from "./api/routes/launcherOld.routes";
 import InteractionsService from "./api/services/Interactions/Interactions.service";
+import SubServerStatusService from "./api/services/server/sub-server-status.service";
 import SocketRouter from "./api/routes/socket.routes";
 import AuthJwtVerify from "./api/middlewares/authJwtVerify";
 import SocketIo from "./socket/SocketIo";
@@ -73,6 +74,7 @@ export default class App {
     logger.info(`Api Service Version: ${environment.api_version}`);
     Mysql.connect();
     InteractionsService.initLoopPings();
+    SubServerStatusService.initStatusLoop();
   }
 
   private _settings(): void {
