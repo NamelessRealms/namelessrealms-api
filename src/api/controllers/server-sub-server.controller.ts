@@ -97,13 +97,10 @@ export default class ServerSubServerController {
     const { name, icon_url, host, port, sync_mode, position } = request.body;
 
     const resolvedName = (name ?? fallback?.name)?.toString().trim();
-    const resolvedHost = (host ?? fallback?.host)?.toString().trim();
+    // host 可選：新增時可只填名稱，缺省為空字串，之後在連線設定補
+    const resolvedHost = (host ?? fallback?.host)?.toString().trim() ?? "";
     if (!resolvedName) {
       response.status(400).json({ message: "name 為必填" });
-      return null;
-    }
-    if (!resolvedHost) {
-      response.status(400).json({ message: "host 為必填" });
       return null;
     }
 
