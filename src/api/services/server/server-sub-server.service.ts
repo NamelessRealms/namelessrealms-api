@@ -21,6 +21,7 @@ export interface SubServer {
   server_id: string;
   name: string;
   description: string | null;
+  tags: string[];
   icon_url: string | null;
   host: string;
   port: number;
@@ -34,6 +35,7 @@ export interface SubServer {
 export interface SubServerInput {
   name: string;
   description: string | null;
+  tags: string[];
   icon_url: string | null;
   host: string;
   port: number;
@@ -53,7 +55,7 @@ export default class ServerSubServerService {
   /** 取得某品牌伺服器底下的所有子伺服器，依 position 由小到大排序 */
   public async getSubServers(serverId: string): Promise<SubServer[]> {
     const [rows]: any = await Mysql.getPool().query(
-      "SELECT id, server_id, name, description, icon_url, host, port, sync_mode, is_online, player_count, position FROM server_sub_servers WHERE server_id = ? ORDER BY position ASC",
+      "SELECT id, server_id, name, description, tags, icon_url, host, port, sync_mode, is_online, player_count, position FROM server_sub_servers WHERE server_id = ? ORDER BY position ASC",
       [serverId]
     );
     return (rows as any[]).map(this._mapRow);
@@ -62,7 +64,7 @@ export default class ServerSubServerService {
   /** 取得單一子伺服器，不存在時回傳 null */
   public async getSubServerById(subServerId: string): Promise<SubServer | null> {
     const [rows]: any = await Mysql.getPool().query(
-      "SELECT id, server_id, name, description, icon_url, host, port, sync_mode, is_online, player_count, position FROM server_sub_servers WHERE id = ? LIMIT 1",
+      "SELECT id, server_id, name, description, tags, icon_url, host, port, sync_mode, is_online, player_count, position FROM server_sub_servers WHERE id = ? LIMIT 1",
       [subServerId]
     );
     return rows.length > 0 ? this._mapRow(rows[0]) : null;
@@ -72,8 +74,8 @@ export default class ServerSubServerService {
   public async createSubServer(serverId: string, input: SubServerInput): Promise<{ id: string }> {
     const id = crypto.randomUUID();
     await Mysql.getPool().query(
-      "INSERT INTO server_sub_servers (id, server_id, name, description, icon_url, host, port, sync_mode, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [id, serverId, input.name, input.description, input.icon_url, input.host, input.port, input.sync_mode, input.position]
+      "INSERT INTO server_sub_servers (id, server_id, name, description, tags, icon_url, host, port, sync_mode, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [id, serverId, input.name, input.description, JSON.stringify(input.tags), input.icon_url, input.host, input.port, input.sync_mode, input.position]
     );
     return { id };
   }
@@ -81,8 +83,8 @@ export default class ServerSubServerService {
   /** 更新子伺服器的可編輯欄位 */
   public async updateSubServer(subServerId: string, input: SubServerInput): Promise<void> {
     await Mysql.getPool().query(
-      "UPDATE server_sub_servers SET name = ?, description = ?, icon_url = ?, host = ?, port = ?, sync_mode = ?, position = ? WHERE id = ?",
-      [input.name, input.description, input.icon_url, input.host, input.port, input.sync_mode, input.position, subServerId]
+      "UPDATE server_sub_servers SET name = ?, description = ?, tags = ?, icon_url = ?, host = ?, port = ?, sync_mode = ?, position = ? WHERE id = ?",
+      [input.name, input.description, JSON.stringify(input.tags), input.icon_url, input.host, input.port, input.sync_mode, input.position, subServerId]
     );
   }
 
@@ -128,10 +130,11 @@ export default class ServerSubServerService {
     await Mysql.getPool().query("DELETE FROM sub_server_media WHERE id = ?", [mediaId]);
   }
 
-  /** 將資料庫列正規化為 SubServer（TINYINT → boolean、數值欄位轉 number） */
+  /** 將資料庫列正規化為 SubServer（TINYINT → boolean、tags JSON 反序列化、數值欄位轉 number） */
   private _mapRow(row: any): SubServer {
     return {
       ...row,
+      tags: typeof row.tags === "string" ? JSON.parse(row.tags) : (row.tags ?? []),
       port: Number(row.port),
       is_online: row.is_online === 1,
       player_count: Number(row.player_count),

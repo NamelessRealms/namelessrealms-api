@@ -37,6 +37,7 @@ export interface ServerCard {
   tags: string[];
   icon_url: string | null;
   background_url: string | null;
+  cover_url: string | null;
   is_online: boolean;
   player_count: number;
   position: number;
@@ -81,10 +82,11 @@ export default class ServerService {
       "INSERT INTO server_members (server_id, user_id, role_id) VALUES (?, ?, ?)",
       [id, ownerUserId, roleId]
     );
-    // 建立同名預設子伺服器：單一伺服器的服主毋須意識到「子伺服器」概念，host 留空待連線設定補
+    // 建立同名預設子伺服器：單一伺服器的服主毋須意識到「子伺服器」概念，host 留空待連線設定補；
+    // 建立時填的 description/tags 屬展示層、直接落在這台可見的子伺服器上
     await pool.query(
-      "INSERT INTO server_sub_servers (id, server_id, name, host, position) VALUES (?, ?, ?, '', 0)",
-      [subServerId, id, name]
+      "INSERT INTO server_sub_servers (id, server_id, name, description, tags, host, position) VALUES (?, ?, ?, ?, ?, '', 0)",
+      [subServerId, id, name, description, JSON.stringify(tags)]
     );
     return { id };
   }
@@ -96,11 +98,12 @@ export default class ServerService {
   public async getServerCards(): Promise<ServerCard[]> {
     const [rows]: any = await Mysql.getPool().query(
       `SELECT
-        s.id AS server_id, s.owner_user_id, s.name AS server_name, s.tags,
-        ss.id AS sub_server_id, ss.name AS sub_name, ss.description AS sub_description,
+        s.id AS server_id, s.owner_user_id, s.name AS server_name,
+        ss.id AS sub_server_id, ss.name AS sub_name, ss.description AS sub_description, ss.tags AS sub_tags,
         ss.is_online, ss.player_count, ss.position,
         (SELECT url FROM server_media WHERE server_id = s.id AND media_type = 'icon' LIMIT 1) AS icon_url,
-        (SELECT url FROM server_media WHERE server_id = s.id AND media_type = 'background' LIMIT 1) AS background_url
+        (SELECT url FROM server_media WHERE server_id = s.id AND media_type = 'background' LIMIT 1) AS background_url,
+        (SELECT url FROM sub_server_media WHERE sub_server_id = ss.id ORDER BY position ASC LIMIT 1) AS cover_url
       FROM servers s
       JOIN server_sub_servers ss ON ss.server_id = s.id
       ORDER BY s.created_at DESC, ss.position ASC`
@@ -112,9 +115,10 @@ export default class ServerService {
       sub_server_id: row.sub_server_id,
       name: row.sub_name,
       description: row.sub_description ?? "",
-      tags: typeof row.tags === "string" ? JSON.parse(row.tags) : (row.tags ?? []),
+      tags: typeof row.sub_tags === "string" ? JSON.parse(row.sub_tags) : (row.sub_tags ?? []),
       icon_url: row.icon_url ?? null,
       background_url: row.background_url ?? null,
+      cover_url: row.cover_url ?? null,
       is_online: row.is_online === 1,
       player_count: Number(row.player_count),
       position: Number(row.position),

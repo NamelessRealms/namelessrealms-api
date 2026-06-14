@@ -161,7 +161,7 @@ export default class ServerSubServerController {
     response: Response,
     fallback?: SubServerInput
   ): SubServerInput | null {
-    const { name, description, icon_url, host, port, sync_mode, position } = request.body;
+    const { name, description, tags, icon_url, host, port, sync_mode, position } = request.body;
 
     const resolvedName = (name ?? fallback?.name)?.toString().trim();
     // host 可選：新增時可只填名稱，缺省為空字串，之後在連線設定補
@@ -180,6 +180,7 @@ export default class ServerSubServerController {
     return {
       name: resolvedName,
       description: description ?? fallback?.description ?? null,
+      tags: Array.isArray(tags) ? tags : (fallback?.tags ?? []),
       icon_url: icon_url ?? fallback?.icon_url ?? null,
       host: resolvedHost,
       port: Number(port ?? fallback?.port ?? 25565),

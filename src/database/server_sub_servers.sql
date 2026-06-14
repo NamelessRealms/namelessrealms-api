@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS `server_sub_servers` (
   `server_id`    VARCHAR(36)                      NOT NULL,           -- FK→servers（品牌）
   `name`         VARCHAR(100)                     NOT NULL,
   `description`  TEXT                             NULL,               -- 子伺服器介紹（玩家端展示用）
+  `tags`         JSON                             DEFAULT NULL,       -- 子伺服器標籤（玩家端篩選用）
   `icon_url`     TEXT                             NULL,
   `host`         VARCHAR(255)                     NOT NULL,           -- 連線位址
   `port`         INT                              NOT NULL DEFAULT 25565,
