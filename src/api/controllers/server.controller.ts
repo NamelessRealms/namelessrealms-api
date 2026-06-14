@@ -39,8 +39,8 @@ export default class ServerController {
   }
 
   public async getServers(_request: Request, response: Response): Promise<void> {
-    const servers = await this._serverService.getAllServers();
-    response.json(servers.map(({ owner_user_id: _, ...pub }) => pub));
+    const cards = await this._serverService.getServerCards();
+    response.json(cards.map(({ owner_user_id: _, ...pub }) => pub));
   }
 
   public async getServer(request: Request, response: Response): Promise<void> {

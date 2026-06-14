@@ -215,6 +215,33 @@ export default class ServerRouter extends IRoutes {
         )
       );
 
+    // 子伺服器媒體展示區（gallery）：列出（公開）／上傳（需 MANAGE_SERVER）
+    this._routers
+      .route("/:serverId/sub-servers/:subServerId/media")
+      .get(
+        asyncHandler((req: Request, res: Response) =>
+          this._subServerController.getSubServerMedia(req, res)
+        )
+      )
+      .post(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        upload.single("file") as any,
+        asyncHandler((req: Request, res: Response) =>
+          this._subServerController.uploadSubServerMedia(req, res)
+        )
+      );
+
+    this._routers
+      .route("/:serverId/sub-servers/:subServerId/media/:mediaId")
+      .delete(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) =>
+          this._subServerController.deleteSubServerMedia(req, res)
+        )
+      );
+
     this._routers
       .route("/:serverId/sub-servers/:subServerId")
       .get(
