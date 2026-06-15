@@ -26,11 +26,9 @@ import WhitelistRoutes from "./api/routes/whitelist.routes";
 import UserRouter from "./api/routes/user.routes";
 import SponsorRouter from "./api/routes/sponsor.routes";
 import ViolationRouter from "./api/routes/violation.routes";
-import LauncherRouter from "./api/routes/launcher.routes";
 import ServerRouter from "./api/routes/server.routes";
 import ModsRoutes from "./api/routes/mods.routes";
 import InteractionsRouter from "./api/routes/interactions.routes";
-import LauncherV2Router from "./api/routes/launcherV2.routes";
 import ModpacksRoutes from "./api/routes/modpacks.routes";
 
 import Mysql from "./api/utils/mysql";
@@ -39,7 +37,6 @@ import pinoHttp from "pino-http";
 
 // environment
 import { environment } from "./environment/environment";
-import LauncherOldRouter from "./api/routes/launcherOld.routes";
 import InteractionsService from "./api/services/Interactions/Interactions.service";
 import SubServerStatusService from "./api/services/server/sub-server-status.service";
 import SocketRouter from "./api/routes/socket.routes";
@@ -123,16 +120,11 @@ export default class App {
     new UserRouter(this._app);
     new SponsorRouter(this._app);
     new ViolationRouter(this._app);
-    new LauncherRouter(this._app);
     new ServerRouter(this._app);
     new ModsRoutes(this._app);
     new ModpacksRoutes(this._app);
-    new LauncherV2Router(this._app);
     new SocketRouter(this._app);
     // new InteractionsRouter(this._app);
-
-    // old
-    new LauncherOldRouter(this._app);
 
     // 全域錯誤處理（必須放在所有路由之後）
     this._app.use(errorMiddleware);
