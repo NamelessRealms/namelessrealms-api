@@ -30,3 +30,5 @@ SOURCE server_media.sql;        -- → servers
 SOURCE server_sub_servers.sql;  -- → servers
 SOURCE sub_server_media.sql;    -- → server_sub_servers
 SOURCE server_modpack.sql;      -- server_modpack_versions（僅 index，無 FK）
+SOURCE modpack_file_refs.sql;   -- → server_modpack_versions（池引用計數）
+SOURCE cf_file_hashes.sql;      -- CF fileId → 後端親算 sha256 快取（無 FK）

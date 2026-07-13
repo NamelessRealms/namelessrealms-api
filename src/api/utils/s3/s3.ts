@@ -8,7 +8,14 @@
  * @notes 使用 forcePathStyle = true 以相容 MinIO；endpoint 與認證由環境變數提供；
  *        MINIO_PUBLIC_ENDPOINT 用於組成外網可存取的 URL
  */
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+} from "@aws-sdk/client-s3";
+import fs from "fs";
 import path from "path";
 
 const endpoint = process.env.MINIO_ENDPOINT!;
@@ -25,6 +32,17 @@ const s3 = new S3Client({
   forcePathStyle: true,
 });
 
+/**
+ * 由 key 組出可存取的公開 URL（帶 `?v=` cache-buster）。
+ *
+ * 供 headObject 命中、跳過上傳但仍需 URL 的情境（全域池去重）使用。
+ *
+ * @param key - S3 物件 key
+ */
+export function publicUrlForKey(key: string): string {
+  return `${publicEndpoint}/${bucket}/${key}?v=${Date.now()}`;
+}
+
 export async function uploadToS3(
   key: string,
   buffer: Buffer,
@@ -40,6 +58,55 @@ export async function uploadToS3(
     })
   );
   return `${publicEndpoint}/${bucket}/${key}?v=${Date.now()}`;
+}
+
+/**
+ * 以串流方式將本機檔案上傳至指定 key，回傳可存取的公開 URL。
+ *
+ * 用於全域共用池：mod 檔先落暫存算 sha256，再以 sha256 為 key 上傳，
+ * 全程不將整檔讀進記憶體（Body 走 fs.ReadStream，並帶 ContentLength）。
+ *
+ * @param key - S3 物件 key（例如 `mods/files/{sha256}.jar`）
+ * @param filePath - 本機暫存檔路徑
+ * @param contentType - 內容型別
+ * @returns 可存取的公開 URL（同 uploadToS3 格式）
+ */
+export async function uploadFileToS3(
+  key: string,
+  filePath: string,
+  contentType: string
+): Promise<string> {
+  const { size } = await fs.promises.stat(filePath);
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: fs.createReadStream(filePath),
+      ContentLength: size,
+      ContentType: contentType,
+      CacheControl: "no-cache",
+    })
+  );
+  return publicUrlForKey(key);
+}
+
+/**
+ * 查詢指定 key 的物件是否已存在（內容定址池的去重判斷）。
+ *
+ * @param key - 要查詢的物件 key
+ * @returns 存在回傳 true；不存在（404 / NotFound）回傳 false
+ */
+export async function headObjectExists(key: string): Promise<boolean> {
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return true;
+  } catch (err: any) {
+    const status = err?.$metadata?.httpStatusCode;
+    if (status === 404 || err?.name === "NotFound" || err?.name === "NoSuchKey") {
+      return false;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -67,6 +134,31 @@ export function keyFromUrl(url: string): string | null {
   const clean = url.split("?")[0];
   if (!clean.startsWith(prefix)) return null;
   return clean.slice(prefix.length);
+}
+
+/**
+ * 列出指定前綴下所有物件的 key（自動分頁）。
+ *
+ * @param prefix - key 前綴（例如 `mods/files/`）
+ * @returns 所有符合前綴的物件 key
+ */
+export async function listObjectKeys(prefix: string): Promise<string[]> {
+  const keys: string[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const resp = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+    for (const obj of resp.Contents ?? []) {
+      if (obj.Key) keys.push(obj.Key);
+    }
+    continuationToken = resp.IsTruncated ? resp.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return keys;
 }
 
 export function getExtFromMime(contentType: string): string {

@@ -26,6 +26,14 @@ import AdmZip from "adm-zip";
 import { Request, Response } from "express";
 import Mysql from "../utils/mysql";
 import { uploadToS3 } from "../utils/s3/s3";
+import { config } from "../../config/config.service";
+import {
+  createImportLimiter,
+  ensureBufferInPool,
+  ensureCurseforgeFileInPool,
+  ensureModrinthFileInPool,
+  PoolResolveError,
+} from "../utils/modpool/pool";
 import ModsService from "../services/mods/mods.service";
 
 const modsService = new ModsService();
@@ -116,22 +124,52 @@ export async function importVersion(req: Request, res: Response): Promise<void> 
     }
     versionLabel = manifest.name ? `${manifest.name}-${manifest.version ?? "imported"}` : "cf-imported";
 
-    // 批量查 CF API
+    // 批量查 CF API，逐檔下載位元組進全域池（sha256 正規化）；全有或全無
     const fileIds: string[] = (manifest.files ?? []).map((f: any) => String(f.fileID));
-    if (fileIds.length > 0 && process.env.CURSEFORGE_KEY) {
-      try {
-        const cfResult = await modsService.getModFiles(fileIds);
-        for (const cfFile of cfResult?.data ?? []) {
+    if (fileIds.length > 0) {
+      if (!config.curseforgeKey) {
+        res.status(400).json({ message: "缺少 CURSEFORGE_KEY，無法解析 CurseForge 檔案" });
+        return;
+      }
+      const cfResult = await modsService.getModFiles(fileIds);
+      const cfFiles: any[] = cfResult?.data ?? [];
+      const limiter = createImportLimiter();
+      const failures: string[] = [];
+
+      // CF API 未回傳的 fileId 視為取不到（不建半殘包）
+      const returnedIds = new Set(cfFiles.map((c) => String(c.id)));
+      for (const fid of fileIds) {
+        if (!returnedIds.has(fid)) failures.push(`fileId ${fid}`);
+      }
+
+      const resolved = await Promise.allSettled(
+        cfFiles.map((cfFile) =>
+          ensureCurseforgeFileInPool(
+            { fileId: Number(cfFile.id), fileName: cfFile.fileName, downloadUrl: cfFile.downloadUrl },
+            config.curseforgeKey,
+            limiter
+          ).then((pool) => ({ cfFile, pool }))
+        )
+      );
+      for (const r of resolved) {
+        if (r.status === "fulfilled") {
+          const { cfFile, pool } = r.value;
           fileRecords.push({
             file_name: cfFile.fileName,
             dest_path: `mods/${cfFile.fileName}`,
-            file_url: cfFile.downloadUrl ?? "",
-            file_hash: String(cfFile.fileFingerprint),
-            file_size_bytes: cfFile.fileLength ?? 0,
+            file_url: pool.url,
+            file_hash: pool.sha256,
+            file_size_bytes: pool.size,
           });
+        } else {
+          const reason = r.reason;
+          failures.push(reason instanceof PoolResolveError ? reason.fileName : "未知檔案");
         }
-      } catch {
-        // CF API 失敗時跳過，仍建立版本
+      }
+
+      if (failures.length > 0) {
+        res.status(422).json({ message: "部分 CurseForge 檔案無法取得，未建立版本", failures });
+        return;
       }
     }
 
@@ -165,14 +203,33 @@ export async function importVersion(req: Request, res: Response): Promise<void> 
     else if (forgeVersion) { modloader = "Forge"; modloaderVersion = forgeVersion; }
     versionLabel = index.name ? `${index.name}-${index.versionId ?? "imported"}` : "modrinth-imported";
 
-    for (const f of index.files ?? []) {
-      fileRecords.push({
-        file_name: path.basename(f.path),
-        dest_path: f.path,
-        file_url: f.downloads?.[0] ?? "",
-        file_hash: f.hashes?.sha256 ?? "",
-        file_size_bytes: f.fileSize ?? 0,
-      });
+    // 逐檔進全域池（headObject 命中則免下載；未命中則下載並核對 API sha256）；全有或全無
+    const mrFiles: any[] = index.files ?? [];
+    if (mrFiles.length > 0) {
+      const limiter = createImportLimiter();
+      const failures: string[] = [];
+      const resolved = await Promise.allSettled(
+        mrFiles.map((f) => ensureModrinthFileInPool(f, limiter).then((pool) => ({ f, pool })))
+      );
+      for (const r of resolved) {
+        if (r.status === "fulfilled") {
+          const { f, pool } = r.value;
+          fileRecords.push({
+            file_name: path.basename(f.path),
+            dest_path: f.path,
+            file_url: pool.url,
+            file_hash: pool.sha256,
+            file_size_bytes: pool.size,
+          });
+        } else {
+          const reason = r.reason;
+          failures.push(reason instanceof PoolResolveError ? reason.fileName : "未知檔案");
+        }
+      }
+      if (failures.length > 0) {
+        res.status(422).json({ message: "部分 Modrinth 檔案無法取得，未建立版本", failures });
+        return;
+      }
     }
 
     // overrides/ 資料夾
@@ -351,10 +408,37 @@ export async function publishVersion(req: Request, res: Response): Promise<void>
   const key = `modpacks/${serverId}/${versionId}/manifest.json`;
   const manifestUrl = await uploadToS3(key, manifestBuffer, "application/json");
 
-  await Mysql.getPool().query(
-    "UPDATE server_modpack_versions SET status = 'published', manifest_url = ?, draft_files = '[]' WHERE id = ?",
-    [manifestUrl, versionId]
+  // 引用計數：只對 url 指向全域池（mods/files/）的條目記引用；overrides/自訂 zip 跳過。
+  // 只有 published 算引用，故在此維護；重新 publish 先清舊列再插新列（同 transaction）。
+  const poolSha256s = Array.from(
+    new Set(
+      files
+        .filter((f) => typeof f.file_url === "string" && f.file_url.includes("/mods/files/"))
+        .map((f) => f.file_hash as string)
+    )
   );
+
+  const conn = await Mysql.getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query(
+      "UPDATE server_modpack_versions SET status = 'published', manifest_url = ?, draft_files = '[]' WHERE id = ?",
+      [manifestUrl, versionId]
+    );
+    await conn.query("DELETE FROM modpack_file_refs WHERE version_id = ?", [versionId]);
+    for (const sha256 of poolSha256s) {
+      await conn.query(
+        "INSERT IGNORE INTO modpack_file_refs (sha256, version_id) VALUES (?, ?)",
+        [sha256, versionId]
+      );
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 
   const [updated]: any = await Mysql.getPool().query(
     "SELECT * FROM server_modpack_versions WHERE id = ?",
@@ -416,10 +500,11 @@ export async function addFile(req: Request, res: Response): Promise<void> {
   }
 
   const buffer = req.file.buffer;
-  const hash = crypto.createHash("sha256").update(buffer).digest("hex");
-  const ext = path.extname(req.file.originalname);
-  const key = `modpacks/${serverId}/files/${hash}${ext}`;
-  const url = await uploadToS3(key, buffer, req.file.mimetype || "application/octet-stream");
+  const pool = await ensureBufferInPool(
+    buffer,
+    req.file.originalname,
+    req.file.mimetype || "application/octet-stream"
+  );
 
   const fileId = crypto.randomUUID();
   const newFile = {
@@ -427,9 +512,9 @@ export async function addFile(req: Request, res: Response): Promise<void> {
     version_id: versionId,
     file_name: req.file.originalname,
     dest_path: dest_path.trim(),
-    file_url: url,
-    file_hash: hash,
-    file_size_bytes: buffer.length,
+    file_url: pool.url,
+    file_hash: pool.sha256,
+    file_size_bytes: pool.size,
   };
 
   const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
