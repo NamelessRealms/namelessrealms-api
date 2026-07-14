@@ -82,3 +82,14 @@ yarn start
 - 超過 10 行的 private 函數也要加
 - TS/JS 用 JSDoc，Rust 用 ///
 - 格式參考 ~/.claude/commands/add-file-comments.md
+
+# 驗收與產物重建紀律
+
+## 任務完成後產出
+- 實作完成後必須產出驗收報告：每個任務實作完成後主動產出 `docs/tasks/{任務代號}-verification.md`（例 `F4-F5-verification.md`，格式沿用 `docs/tasks/verification_template.md`），不需等我要求。內容含：變更檔案、設計重點、測試結果、正向/負向流程的實際執行輸出、git 三步對帳、產物重建確認、回歸守門、守界聲明。跨 repo 任務時，報告放本次「主要變更 repo」的 `docs/tasks/`；任務包會註明主 repo。
+- CI 措辭精確：任務完成需 local green + remote Actions 綠（附 run 連結）；Actions 紅則任務不算完成。仍不可把本地綠燈當「CI 通過」。
+- 驗收報告不得用範本／預期值／設計推理冒充已執行；真機做不到就誠實標「待人工」。
+
+## 產物重建
+- 改 API 原始碼 → 重啟服務（TS 則先重 build）。無原始碼變更標「沿用現有產物」。
+- 對外 API 缺欄／錯誤 → 回乾淨的結構化錯誤，不回框架預設純文字錯誤導致上游 5xx。
