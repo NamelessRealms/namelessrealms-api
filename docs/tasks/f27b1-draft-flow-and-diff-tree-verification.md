@@ -50,14 +50,17 @@
 
 ## git 對帳
 ```
-git log --oneline -1     → 9b42239 feat: F30a manifest per-file policy 契約（...）
-git status               → M controller / M routes / M sql；?? tests/modpool/f27b1-draft-flow.test.ts（尚未 commit）
-git rev-parse HEAD origin/main → 待 commit/push 後對帳
+git log --oneline -1     → 0824c22 feat: F27b-1 草稿衍生 + 節點增刪改端點（收債 §12.7/§12.8 + F30b policy）
+git status               → 本次變更已 commit（工作區另有本報告 CI/對帳回填之後續 commit）
+git rev-parse HEAD       → 0824c2243215d30c65b75fb2bf13f6f8d6b8df23
+git rev-parse origin/developers → 0824c2243215d30c65b75fb2bf13f6f8d6b8df23   （本地 = 遠端）
 ```
+> 註：此 repo 工作分支為 `developers`（非 main）；CI 於 `developers` 觸發。
 
 ## CI
 - 本地：`yarn vitest run` green、`npx tsc --noEmit` green。
-- 狀態措辭：**local green, remote Actions 待人工確認**（push 後貼 run 連結）。
+- 遠端：**local green + remote Actions 綠（附連結）** — run 成功（commit 0824c22）：
+  https://github.com/NamelessRealms/namelessrealms-api/actions/runs/29517772778
 
 ## 回歸守門
 - 既有 `tests/modpool/policy.test.ts`、`publish-refs.test.ts` 全綠——publish guard 對既有測試（version 為 draft）不觸發、policy 透傳鏈未受 §12.8/§3.5 波及。
