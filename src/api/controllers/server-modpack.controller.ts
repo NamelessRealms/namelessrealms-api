@@ -16,9 +16,12 @@
  *   - activateVersion: 設為目前版本（is_active 以子伺服器為單位）
  *   - getActiveModpackForSubServer: 取某子伺服器啟用中的版本（供啟動流程取 manifest）
  *   - publishVersion: 產生 manifest.json 上傳 S3 並清空 draft_files
+ *   - deriveVersion: 從 published 版本 copy-on-write 衍生新草稿（base_version_id 指回基底）
  *   - getFiles: 取得版本的檔案列表（draft 從 JSON 欄位，published 從 S3 manifest）
- *   - addFile: 上傳單一檔案到版本（只允許 draft）
+ *   - addFile: 上傳單一檔案到版本（只允許 draft；同 dest_path 為替換語意）
  *   - removeFile: 從版本移除檔案（只允許 draft，不刪 S3）
+ *   - restoreFile: 從基底版本還原單一檔案 entry 回草稿（涵蓋還原修改與還原刪除）
+ *   - updateFilePolicy: 更新草稿內單一檔案的 policy（enforced ⇄ default）
  */
 import crypto from "crypto";
 import path from "path";
@@ -389,6 +392,12 @@ export async function publishVersion(req: Request, res: Response): Promise<void>
   if (!vRows.length) { res.status(404).json({ message: "找不到該版本" }); return; }
   const version = vRows[0];
 
+  // §12.7：已發布版本不可重 publish（避免以空 draft_files 覆寫既有 manifest）。
+  if (version.status === "published") {
+    res.status(409).json({ code: "Conflict", message: "此版本已發布，無法重複發布" });
+    return;
+  }
+
   const files: any[] = JSON.parse(version.draft_files || "[]");
 
   const manifest = {
@@ -448,6 +457,64 @@ export async function publishVersion(req: Request, res: Response): Promise<void>
   );
   const { draft_files: _df, ...row } = updated[0];
   res.json({ ...row, is_active: row.is_active === 1, file_count: files.length });
+}
+
+/**
+ * 從已發布版本 copy-on-write 衍生新草稿：複製 metadata 與基底 manifest 的檔案清單，
+ * base_version_id 指回基底。前置：:versionId 必須是 published 版本。
+ */
+export async function deriveVersion(req: Request, res: Response): Promise<void> {
+  const { serverId, versionId } = req.params;
+  const { label } = req.body;
+
+  const [vRows]: any = await Mysql.getPool().query(
+    "SELECT * FROM server_modpack_versions WHERE id = ? AND server_id = ?",
+    [versionId, serverId]
+  );
+  if (!vRows.length) { res.status(404).json({ message: "找不到該版本" }); return; }
+  const base = vRows[0];
+  if (base.status !== "published") {
+    res.status(409).json({ code: "Conflict", message: "只能從已發布的版本衍生草稿" });
+    return;
+  }
+
+  // 基底檔案來自 published manifest；缺 manifest_url 視為空清單。
+  const draftId = crypto.randomUUID();
+  let draftFiles: any[] = [];
+  if (base.manifest_url) {
+    const resp = await fetch(base.manifest_url);
+    const manifest: any = await resp.json();
+    draftFiles = (manifest.files as any[]).map((f) => ({
+      id: crypto.randomUUID(),
+      version_id: draftId,
+      file_name: (f.path as string).split("/").pop(),
+      dest_path: f.path,
+      file_url: f.url,
+      file_hash: f.hash,
+      file_size_bytes: f.size,
+      // manifest 精簡時省略 enforced；衍生時一律落地為明確值，與 getFiles 缺省補值一致。
+      policy: f.policy ?? "enforced",
+    }));
+  }
+
+  const draftLabel = label?.trim() || `${base.version_label}-draft`;
+
+  await Mysql.getPool().query(
+    `INSERT INTO server_modpack_versions
+       (id, server_id, sub_server_id, version_label, mc_version, modloader, modloader_version,
+        notes, status, base_version_id, draft_files, file_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+    [draftId, serverId, base.sub_server_id ?? null, draftLabel, base.mc_version, base.modloader,
+      base.modloader_version ?? null, base.notes ?? null, versionId,
+      JSON.stringify(draftFiles), draftFiles.length]
+  );
+
+  const [rows]: any = await Mysql.getPool().query(
+    "SELECT * FROM server_modpack_versions WHERE id = ?",
+    [draftId]
+  );
+  const { draft_files: _df, ...row } = rows[0];
+  res.status(201).json({ ...row, is_active: false, file_count: draftFiles.length });
 }
 
 /** 取得版本的所有檔案列表（draft 從 draft_files JSON 欄位，published 從 S3 manifest） */
@@ -516,25 +583,40 @@ export async function addFile(req: Request, res: Response): Promise<void> {
     req.file.mimetype || "application/octet-stream"
   );
 
-  const fileId = crypto.randomUUID();
+  const destPath = dest_path.trim();
+  const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
+  // §12.8：同 dest_path 已存在則替換該 entry（沿用原 id 保持前端引用穩定），file_count 不變；
+  // 不存在則追加、file_count + 1。
+  const idx = files.findIndex((f) => f.dest_path === destPath);
+  const existing = idx !== -1 ? files[idx] : null;
+
+  // 替換且請求未明帶 policy 時，沿用原 entry 的 policy（不缺省重置為 enforced）。
+  const resolvedPolicy = policy ?? existing?.policy;
   const newFile = {
-    id: fileId,
+    id: existing ? existing.id : crypto.randomUUID(),
     version_id: versionId,
     file_name: req.file.originalname,
-    dest_path: dest_path.trim(),
+    dest_path: destPath,
     file_url: pool.url,
     file_hash: pool.sha256,
     file_size_bytes: pool.size,
-    // 請求有帶合法 policy 才持久化；未帶則不寫欄位，維持缺省（enforced）語意。
-    ...(policy ? { policy } : {}),
+    // 有合法 policy（明帶或沿用）才持久化；否則不寫欄位，維持缺省（enforced）語意。
+    ...(resolvedPolicy ? { policy: resolvedPolicy } : {}),
   };
 
-  const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
-  files.push(newFile);
-  await Mysql.getPool().query(
-    "UPDATE server_modpack_versions SET draft_files = ?, file_count = file_count + 1 WHERE id = ?",
-    [JSON.stringify(files), versionId]
-  );
+  if (existing) {
+    files[idx] = newFile;
+    await Mysql.getPool().query(
+      "UPDATE server_modpack_versions SET draft_files = ? WHERE id = ?",
+      [JSON.stringify(files), versionId]
+    );
+  } else {
+    files.push(newFile);
+    await Mysql.getPool().query(
+      "UPDATE server_modpack_versions SET draft_files = ?, file_count = file_count + 1 WHERE id = ?",
+      [JSON.stringify(files), versionId]
+    );
+  }
 
   res.status(201).json(newFile);
 }
@@ -559,4 +641,111 @@ export async function removeFile(req: Request, res: Response): Promise<void> {
     [JSON.stringify(files), versionId]
   );
   res.status(204).send();
+}
+
+/**
+ * 從基底版本（base_version_id）的 manifest 還原單一檔案 entry 回草稿。
+ * 同端點涵蓋「還原修改」（同 path 替換）與「還原刪除」（加回消失的 entry）。
+ */
+export async function restoreFile(req: Request, res: Response): Promise<void> {
+  const { serverId, versionId } = req.params;
+  const { destPath } = req.body;
+
+  if (!destPath?.trim()) { res.status(400).json({ message: "destPath 為必填" }); return; }
+  const target = destPath.trim();
+
+  const [vRows]: any = await Mysql.getPool().query(
+    "SELECT status, base_version_id, draft_files FROM server_modpack_versions WHERE id = ? AND server_id = ?",
+    [versionId, serverId]
+  );
+  if (!vRows.length) { res.status(404).json({ message: "找不到該版本" }); return; }
+  if (vRows[0].status !== "draft") {
+    res.status(409).json({ code: "Conflict", message: "只能對 draft 版本還原檔案" });
+    return;
+  }
+  if (!vRows[0].base_version_id) {
+    res.status(422).json({ message: "此草稿無基底版本，無法還原" });
+    return;
+  }
+
+  // 從基底 published manifest 取還原來源。
+  const [bRows]: any = await Mysql.getPool().query(
+    "SELECT manifest_url FROM server_modpack_versions WHERE id = ?",
+    [vRows[0].base_version_id]
+  );
+  if (!bRows.length || !bRows[0].manifest_url) {
+    res.status(404).json({ message: "基底版本無此檔案" });
+    return;
+  }
+  const resp = await fetch(bRows[0].manifest_url);
+  const manifest: any = await resp.json();
+  const baseEntry = (manifest.files as any[]).find((f) => f.path === target);
+  if (!baseEntry) { res.status(404).json({ message: "基底版本無此檔案" }); return; }
+
+  const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
+  const idx = files.findIndex((f) => f.dest_path === target);
+  const restored = {
+    // 還原修改：沿用原 draft entry 的 id 保持前端引用穩定；還原刪除：新 id。
+    id: idx !== -1 ? files[idx].id : crypto.randomUUID(),
+    version_id: versionId,
+    file_name: (baseEntry.path as string).split("/").pop(),
+    dest_path: baseEntry.path,
+    file_url: baseEntry.url,
+    file_hash: baseEntry.hash,
+    file_size_bytes: baseEntry.size,
+    policy: baseEntry.policy ?? "enforced",
+  };
+
+  if (idx !== -1) {
+    // 還原修改：替換原 entry，file_count 不變。
+    files[idx] = restored;
+    await Mysql.getPool().query(
+      "UPDATE server_modpack_versions SET draft_files = ? WHERE id = ?",
+      [JSON.stringify(files), versionId]
+    );
+  } else {
+    // 還原刪除：加回 entry，file_count + 1。
+    files.push(restored);
+    await Mysql.getPool().query(
+      "UPDATE server_modpack_versions SET draft_files = ?, file_count = file_count + 1 WHERE id = ?",
+      [JSON.stringify(files), versionId]
+    );
+  }
+
+  files.sort((a, b) => (a.dest_path as string).localeCompare(b.dest_path));
+  res.json(files.map((f) => ({ ...f, policy: f.policy ?? "enforced" })));
+}
+
+/** 更新草稿內單一檔案的 policy（enforced ⇄ default）；只允許 draft，published 版 409 */
+export async function updateFilePolicy(req: Request, res: Response): Promise<void> {
+  const { serverId, versionId, fileId } = req.params;
+  const { policy } = req.body;
+
+  if (policy !== "enforced" && policy !== "default") {
+    res.status(400).json({ message: "policy 僅接受 enforced | default" });
+    return;
+  }
+
+  const [vRows]: any = await Mysql.getPool().query(
+    "SELECT status, draft_files FROM server_modpack_versions WHERE id = ? AND server_id = ?",
+    [versionId, serverId]
+  );
+  if (!vRows.length) { res.status(404).json({ message: "找不到該版本" }); return; }
+  if (vRows[0].status !== "draft") {
+    res.status(409).json({ code: "Conflict", message: "只能對 draft 版本調整 policy" });
+    return;
+  }
+
+  const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
+  const idx = files.findIndex((f) => f.id === fileId);
+  if (idx === -1) { res.status(404).json({ message: "找不到該檔案" }); return; }
+
+  files[idx].policy = policy;
+  await Mysql.getPool().query(
+    "UPDATE server_modpack_versions SET draft_files = ? WHERE id = ?",
+    [JSON.stringify(files), versionId]
+  );
+
+  files.sort((a, b) => (a.dest_path as string).localeCompare(b.dest_path));
+  res.json(files.map((f) => ({ ...f, policy: f.policy ?? "enforced" })));
 }

@@ -16,13 +16,24 @@ CREATE TABLE IF NOT EXISTS server_modpack_versions (
   draft_files       MEDIUMTEXT                                           NULL,
   -- 快取的檔案數量，draft 時同步更新，發布時保留最後值
   file_count        INT                                                  NOT NULL DEFAULT 0,
-  INDEX idx_server_id (server_id)
+  -- 此 draft 衍生自哪個 published 版本（copy-on-write）；手動建立的空白 draft 為 NULL。
+  -- 基底被刪除時 SET NULL，前端退化為無 diff 檢視。
+  base_version_id   VARCHAR(36)                                          NULL DEFAULT NULL,
+  INDEX idx_server_id (server_id),
+  CONSTRAINT fk_smv_base FOREIGN KEY (base_version_id)
+    REFERENCES server_modpack_versions(id) ON DELETE SET NULL
 );
 
 -- Migration（對已存在的資料庫執行一次）：
 -- ALTER TABLE server_modpack_versions ADD COLUMN draft_files MEDIUMTEXT NULL;
 -- ALTER TABLE server_modpack_versions ADD COLUMN file_count INT NOT NULL DEFAULT 0;
 -- ALTER TABLE server_modpack_versions ADD COLUMN sub_server_id VARCHAR(36) NULL AFTER server_id;
+--
+-- F27b-1 衍生草稿基底欄位（copy-on-write）：
+-- ALTER TABLE server_modpack_versions
+--   ADD COLUMN base_version_id VARCHAR(36) NULL DEFAULT NULL,
+--   ADD CONSTRAINT fk_smv_base FOREIGN KEY (base_version_id)
+--     REFERENCES server_modpack_versions(id) ON DELETE SET NULL;
 --
 -- 把現有 draft 版本的檔案列搬進 JSON 欄位：
 -- UPDATE server_modpack_versions v

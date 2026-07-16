@@ -304,6 +304,23 @@ export default class ServerRouter extends IRoutes {
       );
 
     this._routers
+      .route("/:serverId/modpack-versions/:versionId/derive")
+      .post(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.deriveVersion(req, res))
+      );
+
+    // 注意：files/restore 必須在 files/:fileId 之前，避免 "restore" 被誤解析成 fileId
+    this._routers
+      .route("/:serverId/modpack-versions/:versionId/files/restore")
+      .post(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.restoreFile(req, res))
+      );
+
+    this._routers
       .route("/:serverId/modpack-versions/:versionId/files")
       .get(asyncHandler((req: Request, res: Response) => modpackController.getFiles(req, res)))
       .post(
@@ -315,6 +332,11 @@ export default class ServerRouter extends IRoutes {
 
     this._routers
       .route("/:serverId/modpack-versions/:versionId/files/:fileId")
+      .patch(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.updateFilePolicy(req, res))
+      )
       .delete(
         this._authJwtVerify.verifyToken,
         requirePermission(Permission.MANAGE_SERVER),
