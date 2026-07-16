@@ -401,6 +401,8 @@ export async function publishVersion(req: Request, res: Response): Promise<void>
       url: f.file_url,
       hash: f.file_hash,
       size: Number(f.file_size_bytes),
+      // 僅非缺省（default）才寫出，保持 manifest 精簡；enforced 為缺省，省略。
+      ...(f.policy && f.policy !== "enforced" ? { policy: f.policy } : {}),
     })),
   };
 
@@ -471,6 +473,8 @@ export async function getFiles(req: Request, res: Response): Promise<void> {
       file_url: f.url,
       file_hash: f.hash,
       file_size_bytes: f.size,
+      // manifest 精簡時省略 enforced；回傳一律補上明確值。
+      policy: f.policy ?? "enforced",
     }));
     res.json(files);
     return;
@@ -478,16 +482,22 @@ export async function getFiles(req: Request, res: Response): Promise<void> {
 
   const files: any[] = JSON.parse(draft_files || "[]");
   files.sort((a, b) => (a.dest_path as string).localeCompare(b.dest_path));
-  res.json(files);
+  // draft 舊資料可能無 policy 欄位；回傳一律補上明確值。
+  res.json(files.map((f) => ({ ...f, policy: f.policy ?? "enforced" })));
 }
 
 /** 上傳單一檔案到版本（multer memory + SHA-256 + S3），只允許 draft 版本 */
 export async function addFile(req: Request, res: Response): Promise<void> {
   const { serverId, versionId } = req.params;
-  const { dest_path } = req.body;
+  const { dest_path, policy } = req.body;
 
   if (!req.file) { res.status(400).json({ message: "請上傳檔案" }); return; }
   if (!dest_path?.trim()) { res.status(400).json({ message: "dest_path 為必填" }); return; }
+  // policy 選填；有帶則須為 enforced | default（不帶 = 缺省 enforced，靜默降級難查故拒絕非法值）。
+  if (policy !== undefined && policy !== "enforced" && policy !== "default") {
+    res.status(400).json({ message: "policy 僅接受 enforced | default" });
+    return;
+  }
 
   const [vRows]: any = await Mysql.getPool().query(
     "SELECT status, draft_files FROM server_modpack_versions WHERE id = ? AND server_id = ?",
@@ -515,6 +525,8 @@ export async function addFile(req: Request, res: Response): Promise<void> {
     file_url: pool.url,
     file_hash: pool.sha256,
     file_size_bytes: pool.size,
+    // 請求有帶合法 policy 才持久化；未帶則不寫欄位，維持缺省（enforced）語意。
+    ...(policy ? { policy } : {}),
   };
 
   const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
