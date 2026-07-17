@@ -30,6 +30,14 @@ export default class ModsRoutes extends IRoutes {
         this._modsController.getModFiles(req, res),
       ),
     );
+    // metadata 批次查詢：僅 JWT，不掛 server 權限（metadata 跨 server 共用、非敏感）。
+    this._routers.post(
+      "/metadata/lookup",
+      this._authJwtVerify.verifyToken,
+      asyncHandler((req: Request, res: Response) =>
+        this._modsController.lookupModMetadata(req, res),
+      ),
+    );
     this._routers.route("/:projectId/file/:fileId").get(
       this._authJwtVerify.verifyToken,
       asyncHandler((req: Request, res: Response) =>

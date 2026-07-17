@@ -21,6 +21,7 @@ import {
   uploadToS3,
 } from "../s3/s3";
 import { flxCurseforgeDownloadUrlNullIssues } from "./curseforge-url";
+import { captureModMetadataFromFile } from "../../services/mods/mod-metadata.service";
 
 /** 整個 process 同時進行的「下載+雜湊」總數上限（罩住所有匯入） */
 const GLOBAL_CONCURRENCY = 16;
@@ -278,6 +279,8 @@ export async function ensureCurseforgeFileInPool(
         await uploadFileToS3(key, dl.tmpPath, "application/octet-stream");
       }
       await putCfCache(fileId, dl.sha256, dl.size);
+      // 位元組在手（暫存檔）→ 順路解 metadata 落庫（best-effort，須在 finally 清檔前）。
+      await captureModMetadataFromFile(dl.sha256, dl.tmpPath, ext);
       return { sha256: dl.sha256, url: publicUrlForKey(key), size: dl.size };
     } finally {
       await fs.promises.rm(dl.tmpPath, { force: true });
@@ -338,6 +341,8 @@ export async function ensureModrinthFileInPool(
       if (!(await headObjectExists(key))) {
         await uploadFileToS3(key, dl.tmpPath, "application/octet-stream");
       }
+      // 位元組在手（暫存檔）→ 順路解 metadata 落庫（best-effort，須在 finally 清檔前）。
+      await captureModMetadataFromFile(apiSha256, dl.tmpPath, ext);
       return { sha256: apiSha256, url: publicUrlForKey(key), size: dl.size };
     } finally {
       await fs.promises.rm(dl.tmpPath, { force: true });

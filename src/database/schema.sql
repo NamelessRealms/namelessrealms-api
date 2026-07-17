@@ -21,6 +21,7 @@ SOURCE awaitVerify_whitelist.sql;
 SOURCE manualVerify_whitelist.sql;
 SOURCE tpme_verify_whitelist.sql;
 SOURCE server_whitelist.sql;
+SOURCE mod_metadata.sql;         -- 池物件 sha256 → jar metadata（無 FK）
 
 -- ── 伺服器相依鏈（外鍵，需照順序）──────────────────────────
 SOURCE servers.sql;             -- 品牌層根表

@@ -38,6 +38,7 @@ import {
   PoolResolveError,
 } from "../utils/modpool/pool";
 import ModsService from "../services/mods/mods.service";
+import { captureModMetadata } from "../services/mods/mod-metadata.service";
 
 const modsService = new ModsService();
 
@@ -582,6 +583,8 @@ export async function addFile(req: Request, res: Response): Promise<void> {
     req.file.originalname,
     req.file.mimetype || "application/octet-stream"
   );
+  // 位元組已在記憶體 → 順路解 metadata 落庫（best-effort，不影響上傳主流程）。
+  await captureModMetadata(pool.sha256, buffer, path.extname(req.file.originalname));
 
   const destPath = dest_path.trim();
   const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
