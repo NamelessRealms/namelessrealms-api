@@ -74,15 +74,18 @@
 
 ## git 對帳
 ```
-git log --oneline -1            → a1a1bfe docs: F27b-1 CI 連結與 git 對帳回填（尚未提交本任務）
-git status                      → 本任務變更未提交（M×7 + 新增 5 路徑，見上「變更檔案」）
-git rev-parse --abbrev-ref HEAD → developers
+git log --oneline -2            → 1c028f8 docs: F29 驗收報告（local green，Actions 待人工確認）
+                                  5abd2b7 feat: F29 mod metadata 服務（…）
+git status                      → 乾淨（.gitignore 的 .claude/settings.local.json 一行屬設定配套，未納本任務 commit）
+git rev-parse HEAD              → 1c028f823528163d097a4493c274ca9ff4fc48ba
+git rev-parse origin/developers → 1c028f823528163d097a4493c274ca9ff4fc48ba（本地＝遠端）
 ```
-> 依「push 前先給 commit 計畫確認」慣例，**尚未 commit / push**；待 Yu 確認後提交。commit 後回填本區與 CI run 連結。
 
 ## CI
 - 本地：`yarn test`（vitest run，70 綠）+ `yarn build`（tsc 綠）→ **local green**。
-- 狀態措辭：**local green，remote Actions 待推送後人工確認**（`ci.yml`：Node 22 → `yarn test` + `yarn build`）。**未推送前不得當 CI 通過。**
+- 遠端 Actions：**綠**（`CI` run，conclusion=success，test+build 全過，29s）。
+  run：https://github.com/NamelessRealms/namelessrealms-api/actions/runs/29601605672 （commit `1c028f8`）
+- 狀態措辭：**local green + remote Actions green**（經 `gh run view` 確認 conclusion=success）。
 
 ## 回歸守門
 - 既有 `tests/modpool/`（pool.download / pool.curseforge / recycle / publish-refs / policy / f27b1-draft-flow / curseforge-url）全綠 —— 掛鉤未破壞 F27b-1 / policy / publish-refs 行為。
