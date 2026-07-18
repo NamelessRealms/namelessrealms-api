@@ -75,8 +75,14 @@
 
 ## git 對帳
 ```
-（待 commit / push 後回填）
+git log --oneline -3            → b6f2fab docs: F13a-2 CI run 連結、真機 backfill 實跑與覆蓋統計回填（Actions 綠、360/360）
+                                  031dbf2 docs: F13a-2 驗收報告（local green，Actions 與真機回填待人工）
+                                  a266563 feat: F13a-2 mod metadata 依賴擴充（deps 欄 + 解析 + lookup + backfill --deps）
+git status                      → 乾淨（.gitignore 的 .claude/settings.local.json 一行屬設定配套，未納本任務 commit）
+git rev-parse HEAD              → b6f2fabe74c069c6f53b6bec14ee0f1053b676ae
+git rev-parse origin/developers → b6f2fabe74c069c6f53b6bec14ee0f1053b676ae（本地＝遠端）
 ```
+（本 git 對帳於 b6f2fab push 後驗證；本區塊之回填為其後的 docs-only commit，不改任何程式碼。）
 
 ## CI
 - 本地：`yarn test`（vitest run，96 綠）+ `yarn build`（tsc 綠）+ backfill `tsc --noEmit`（exit 0）→ **local green**。
