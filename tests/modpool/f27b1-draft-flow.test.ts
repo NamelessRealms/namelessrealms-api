@@ -249,8 +249,9 @@ describe("restoreFile 從基底還原", () => {
     poolQuery.mockImplementation(async (sql: string) => {
       if (sql.startsWith("SELECT status, base_version_id, draft_files"))
         return [[{ status: opts?.status ?? "draft", base_version_id: opts?.base === undefined ? "v1" : opts.base, draft_files: JSON.stringify(draftFiles) }], []];
-      if (sql.startsWith("SELECT manifest_url FROM"))
-        return [[{ manifest_url: opts?.baseManifestUrl === undefined ? "https://pool.test/manifest.json" : opts.baseManifestUrl }], []];
+      // F13a-1：基底查詢改 SELECT manifest_url, draft_files（還原來源優先 draft_files，此處基底 draft_files 為空 → fallback manifest）。
+      if (sql.startsWith("SELECT manifest_url, draft_files"))
+        return [[{ manifest_url: opts?.baseManifestUrl === undefined ? "https://pool.test/manifest.json" : opts.baseManifestUrl, draft_files: "[]" }], []];
       return [[], []];
     });
     global.fetch = vi.fn(async () => ({ json: async () => baseManifest })) as any;

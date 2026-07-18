@@ -4,8 +4,11 @@
  *
  * 檔案儲存架構：
  *   - Draft 版本：檔案清單存在 server_modpack_versions.draft_files（JSON TEXT）
- *   - Published 版本：draft_files 清空，檔案從 manifest_url（S3 JSON）讀取
+ *   - Published 版本：draft_files 保留全量 authoring record（含停用項 disabled:true）；
+ *     manifest_url（S3 JSON）僅含啟用中（enabled）條目，供玩家下載
  *   - server_modpack_files 表已廢棄，不再使用
+ *   - entry disabled 旗標（F13a-1）：停用項不進 manifest（玩家不下載），但留存於
+ *     draft_files 跨版本持久（發布留存、衍生帶回、可再啟用）；讀取端一律補 disabled:false
  *
  * @methods
  *   - getVersions: 取得版本列表（含 file_count）；可用 ?subServerId 篩選
@@ -15,9 +18,9 @@
  *   - deleteVersion: 刪除版本（active 版本不可刪）
  *   - activateVersion: 設為目前版本（is_active 以子伺服器為單位）
  *   - getActiveModpackForSubServer: 取某子伺服器啟用中的版本（供啟動流程取 manifest）
- *   - publishVersion: 產生 manifest.json 上傳 S3 並清空 draft_files
- *   - deriveVersion: 從 published 版本 copy-on-write 衍生新草稿（base_version_id 指回基底）
- *   - getFiles: 取得版本的檔案列表（draft 從 JSON 欄位，published 從 S3 manifest）
+ *   - publishVersion: 產生 manifest.json（僅 enabled）上傳 S3；draft_files 保留全量
+ *   - deriveVersion: 從 published 版本 copy-on-write 衍生新草稿（複製基底 draft_files，含 disabled）
+ *   - getFiles: 取得版本的檔案列表（優先讀 draft_files；published 舊版本空值才 fallback manifest）
  *   - addFile: 上傳單一檔案到版本（只允許 draft；同 dest_path 為替換語意）
  *   - removeFile: 從版本移除檔案（只允許 draft，不刪 S3）
  *   - restoreFile: 從基底版本還原單一檔案 entry 回草稿（涵蓋還原修改與還原刪除）
@@ -406,14 +409,17 @@ export async function publishVersion(req: Request, res: Response): Promise<void>
     mc_version: version.mc_version,
     modloader: version.modloader,
     modloader_version: version.modloader_version,
-    files: files.map((f) => ({
-      path: f.dest_path,
-      url: f.file_url,
-      hash: f.file_hash,
-      size: Number(f.file_size_bytes),
-      // 僅非缺省（default）才寫出，保持 manifest 精簡；enforced 為缺省，省略。
-      ...(f.policy && f.policy !== "enforced" ? { policy: f.policy } : {}),
-    })),
+    // 只有啟用中（disabled !== true）的條目寫進 manifest；停用項不發給玩家。
+    files: files
+      .filter((f) => f.disabled !== true)
+      .map((f) => ({
+        path: f.dest_path,
+        url: f.file_url,
+        hash: f.file_hash,
+        size: Number(f.file_size_bytes),
+        // 僅非缺省（default）才寫出，保持 manifest 精簡；enforced 為缺省，省略。
+        ...(f.policy && f.policy !== "enforced" ? { policy: f.policy } : {}),
+      })),
   };
 
   const manifestBuffer = Buffer.from(JSON.stringify(manifest, null, 2), "utf-8");
@@ -421,6 +427,7 @@ export async function publishVersion(req: Request, res: Response): Promise<void>
   const manifestUrl = await uploadToS3(key, manifestBuffer, "application/json");
 
   // 引用計數：只對 url 指向全域池（mods/files/）的條目記引用；overrides/自訂 zip 跳過。
+  // 以全量 draft_files 計（含停用項）——停用檔位元組須不被 recycle_orphan_mods 回收，否則再啟用 404。
   // 只有 published 算引用，故在此維護；重新 publish 先清舊列再插新列（同 transaction）。
   const poolSha256s = Array.from(
     new Set(
@@ -433,8 +440,9 @@ export async function publishVersion(req: Request, res: Response): Promise<void>
   const conn = await Mysql.getPool().getConnection();
   try {
     await conn.beginTransaction();
+    // draft_files 不清空：published 版即保有含停用項的全量 authoring record（供 derive/getFiles/restore）。
     await conn.query(
-      "UPDATE server_modpack_versions SET status = 'published', manifest_url = ?, draft_files = '[]' WHERE id = ?",
+      "UPDATE server_modpack_versions SET status = 'published', manifest_url = ? WHERE id = ?",
       [manifestUrl, versionId]
     );
     await conn.query("DELETE FROM modpack_file_refs WHERE version_id = ?", [versionId]);
@@ -479,10 +487,25 @@ export async function deriveVersion(req: Request, res: Response): Promise<void> 
     return;
   }
 
-  // 基底檔案來自 published manifest；缺 manifest_url 視為空清單。
+  // 基底檔案優先來自基底 draft_files（全量含停用項，disabled 原樣帶回）；
+  // 舊版本（本任務落地前發布）draft_files 為空 → fallback 從 manifest 全量複製（一律 enabled）。
   const draftId = crypto.randomUUID();
   let draftFiles: any[] = [];
-  if (base.manifest_url) {
+  const baseDraft: any[] = JSON.parse(base.draft_files || "[]");
+  if (baseDraft.length) {
+    draftFiles = baseDraft.map((f) => ({
+      id: crypto.randomUUID(),
+      version_id: draftId,
+      file_name: f.file_name,
+      dest_path: f.dest_path,
+      file_url: f.file_url,
+      file_hash: f.file_hash,
+      file_size_bytes: f.file_size_bytes,
+      policy: f.policy ?? "enforced",
+      // 停用狀態原樣帶回新草稿。
+      disabled: f.disabled === true,
+    }));
+  } else if (base.manifest_url) {
     const resp = await fetch(base.manifest_url);
     const manifest: any = await resp.json();
     draftFiles = (manifest.files as any[]).map((f) => ({
@@ -495,6 +518,7 @@ export async function deriveVersion(req: Request, res: Response): Promise<void> 
       file_size_bytes: f.size,
       // manifest 精簡時省略 enforced；衍生時一律落地為明確值，與 getFiles 缺省補值一致。
       policy: f.policy ?? "enforced",
+      disabled: false,
     }));
   }
 
@@ -530,7 +554,9 @@ export async function getFiles(req: Request, res: Response): Promise<void> {
 
   const { status, manifest_url, draft_files } = vers[0];
 
-  if (status === "published" && manifest_url) {
+  const stored: any[] = JSON.parse(draft_files || "[]");
+  // published 舊版本（本任務落地前發布）draft_files 為空 → fallback manifest（全量視為 enabled）。
+  if (status === "published" && stored.length === 0 && manifest_url) {
     const resp = await fetch(manifest_url);
     const manifest: any = await resp.json();
     const files = (manifest.files as any[]).map((f) => ({
@@ -543,27 +569,33 @@ export async function getFiles(req: Request, res: Response): Promise<void> {
       file_size_bytes: f.size,
       // manifest 精簡時省略 enforced；回傳一律補上明確值。
       policy: f.policy ?? "enforced",
+      disabled: false,
     }));
     res.json(files);
     return;
   }
 
-  const files: any[] = JSON.parse(draft_files || "[]");
-  files.sort((a, b) => (a.dest_path as string).localeCompare(b.dest_path));
-  // draft 舊資料可能無 policy 欄位；回傳一律補上明確值。
-  res.json(files.map((f) => ({ ...f, policy: f.policy ?? "enforced" })));
+  // draft 與 published（含 draft_files）同一路徑：全量含停用項。
+  stored.sort((a, b) => (a.dest_path as string).localeCompare(b.dest_path));
+  // 舊資料可能無 policy/disabled 欄位；回傳一律補上明確值。
+  res.json(stored.map((f) => ({ ...f, policy: f.policy ?? "enforced", disabled: f.disabled === true })));
 }
 
 /** 上傳單一檔案到版本（multer memory + SHA-256 + S3），只允許 draft 版本 */
 export async function addFile(req: Request, res: Response): Promise<void> {
   const { serverId, versionId } = req.params;
-  const { dest_path, policy } = req.body;
+  const { dest_path, policy, disabled } = req.body;
 
   if (!req.file) { res.status(400).json({ message: "請上傳檔案" }); return; }
   if (!dest_path?.trim()) { res.status(400).json({ message: "dest_path 為必填" }); return; }
   // policy 選填；有帶則須為 enforced | default（不帶 = 缺省 enforced，靜默降級難查故拒絕非法值）。
   if (policy !== undefined && policy !== "enforced" && policy !== "default") {
     res.status(400).json({ message: "policy 僅接受 enforced | default" });
+    return;
+  }
+  // disabled 選填；有帶則須為 boolean（比照 policy 非法值拒絕）。
+  if (disabled !== undefined && typeof disabled !== "boolean") {
+    res.status(400).json({ message: "disabled 僅接受 boolean" });
     return;
   }
 
@@ -593,8 +625,9 @@ export async function addFile(req: Request, res: Response): Promise<void> {
   const idx = files.findIndex((f) => f.dest_path === destPath);
   const existing = idx !== -1 ? files[idx] : null;
 
-  // 替換且請求未明帶 policy 時，沿用原 entry 的 policy（不缺省重置為 enforced）。
+  // 替換且請求未明帶時，沿用原 entry 的 policy / disabled（不缺省重置）。
   const resolvedPolicy = policy ?? existing?.policy;
+  const resolvedDisabled = disabled ?? existing?.disabled;
   const newFile = {
     id: existing ? existing.id : crypto.randomUUID(),
     version_id: versionId,
@@ -605,6 +638,8 @@ export async function addFile(req: Request, res: Response): Promise<void> {
     file_size_bytes: pool.size,
     // 有合法 policy（明帶或沿用）才持久化；否則不寫欄位，維持缺省（enforced）語意。
     ...(resolvedPolicy ? { policy: resolvedPolicy } : {}),
+    // disabled 僅 true 才寫欄位；缺省 false 省略，讀取端補值。
+    ...(resolvedDisabled ? { disabled: true } : {}),
   };
 
   if (existing) {
@@ -671,18 +706,30 @@ export async function restoreFile(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // 從基底 published manifest 取還原來源。
+  // 還原來源優先取基底 draft_files（全量含停用項）；空/NULL → fallback 基底 manifest（舊版本，全 enabled）。
   const [bRows]: any = await Mysql.getPool().query(
-    "SELECT manifest_url FROM server_modpack_versions WHERE id = ?",
+    "SELECT manifest_url, draft_files FROM server_modpack_versions WHERE id = ?",
     [vRows[0].base_version_id]
   );
-  if (!bRows.length || !bRows[0].manifest_url) {
-    res.status(404).json({ message: "基底版本無此檔案" });
-    return;
+  if (!bRows.length) { res.status(404).json({ message: "基底版本無此檔案" }); return; }
+
+  // 正規化成 manifest-key 形狀（path/url/hash/size/policy/disabled）供後續組裝沿用。
+  let baseEntry: any = null;
+  const baseDraft: any[] = JSON.parse(bRows[0].draft_files || "[]");
+  if (baseDraft.length) {
+    const e = baseDraft.find((f) => f.dest_path === target);
+    if (e) {
+      baseEntry = {
+        path: e.dest_path, url: e.file_url, hash: e.file_hash,
+        size: e.file_size_bytes, policy: e.policy, disabled: e.disabled === true,
+      };
+    }
+  } else if (bRows[0].manifest_url) {
+    const resp = await fetch(bRows[0].manifest_url);
+    const manifest: any = await resp.json();
+    const e = (manifest.files as any[]).find((f) => f.path === target);
+    if (e) baseEntry = { ...e, disabled: false };
   }
-  const resp = await fetch(bRows[0].manifest_url);
-  const manifest: any = await resp.json();
-  const baseEntry = (manifest.files as any[]).find((f) => f.path === target);
   if (!baseEntry) { res.status(404).json({ message: "基底版本無此檔案" }); return; }
 
   const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
@@ -697,6 +744,8 @@ export async function restoreFile(req: Request, res: Response): Promise<void> {
     file_hash: baseEntry.hash,
     file_size_bytes: baseEntry.size,
     policy: baseEntry.policy ?? "enforced",
+    // 連同基底 disabled 狀態抄回。
+    disabled: baseEntry.disabled === true,
   };
 
   if (idx !== -1) {
@@ -716,16 +765,28 @@ export async function restoreFile(req: Request, res: Response): Promise<void> {
   }
 
   files.sort((a, b) => (a.dest_path as string).localeCompare(b.dest_path));
-  res.json(files.map((f) => ({ ...f, policy: f.policy ?? "enforced" })));
+  res.json(files.map((f) => ({ ...f, policy: f.policy ?? "enforced", disabled: f.disabled === true })));
 }
 
-/** 更新草稿內單一檔案的 policy（enforced ⇄ default）；只允許 draft，published 版 409 */
+/**
+ * 更新草稿內單一檔案的 policy（enforced ⇄ default）與/或 disabled（停用旗標）；
+ * 只允許 draft，published 版 409。body 可帶 policy、disabled 其一或皆有，至少一項。
+ */
 export async function updateFilePolicy(req: Request, res: Response): Promise<void> {
   const { serverId, versionId, fileId } = req.params;
-  const { policy } = req.body;
+  const { policy, disabled } = req.body;
 
-  if (policy !== "enforced" && policy !== "default") {
+  // 至少需帶一項可更新欄位；各欄有帶才校驗（不帶 = 不動）。
+  if (policy === undefined && disabled === undefined) {
+    res.status(400).json({ message: "至少需帶 policy 或 disabled 其一" });
+    return;
+  }
+  if (policy !== undefined && policy !== "enforced" && policy !== "default") {
     res.status(400).json({ message: "policy 僅接受 enforced | default" });
+    return;
+  }
+  if (disabled !== undefined && typeof disabled !== "boolean") {
+    res.status(400).json({ message: "disabled 僅接受 boolean" });
     return;
   }
 
@@ -743,12 +804,17 @@ export async function updateFilePolicy(req: Request, res: Response): Promise<voi
   const idx = files.findIndex((f) => f.id === fileId);
   if (idx === -1) { res.status(404).json({ message: "找不到該檔案" }); return; }
 
-  files[idx].policy = policy;
+  if (policy !== undefined) files[idx].policy = policy;
+  // disabled 缺省 false 採「省略欄位」齊一風格（與 addFile 一致）：false 則移除欄位。
+  if (disabled !== undefined) {
+    if (disabled) files[idx].disabled = true;
+    else delete files[idx].disabled;
+  }
   await Mysql.getPool().query(
     "UPDATE server_modpack_versions SET draft_files = ? WHERE id = ?",
     [JSON.stringify(files), versionId]
   );
 
   files.sort((a, b) => (a.dest_path as string).localeCompare(b.dest_path));
-  res.json(files.map((f) => ({ ...f, policy: f.policy ?? "enforced" })));
+  res.json(files.map((f) => ({ ...f, policy: f.policy ?? "enforced", disabled: f.disabled === true })));
 }
