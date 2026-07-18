@@ -330,6 +330,17 @@ export default class ServerRouter extends IRoutes {
         asyncHandler((req: Request, res: Response) => modpackController.addFile(req, res))
       );
 
+    // 注意：files/from-platform 必須在 files/:fileId 之前，避免 "from-platform" 被誤解析成 fileId
+    this._routers
+      .route("/:serverId/modpack-versions/:versionId/files/from-platform")
+      .post(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) =>
+          modpackController.addFileFromPlatform(req, res)
+        )
+      );
+
     this._routers
       .route("/:serverId/modpack-versions/:versionId/files/:fileId")
       .patch(

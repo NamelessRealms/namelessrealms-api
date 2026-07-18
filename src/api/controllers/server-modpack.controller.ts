@@ -41,9 +41,13 @@ import {
   PoolResolveError,
 } from "../utils/modpool/pool";
 import ModsService from "../services/mods/mods.service";
+import PlatformCurseforgeService from "../services/mods/platform-curseforge.service";
+import PlatformModrinthService from "../services/mods/platform-modrinth.service";
 import { captureModMetadata } from "../services/mods/mod-metadata.service";
 
 const modsService = new ModsService();
+const platformCurseforgeService = new PlatformCurseforgeService();
+const platformModrinthService = new PlatformModrinthService();
 
 /** 取得伺服器所有模組包版本（含每版本的檔案數量）；可用 ?subServerId 篩選某子伺服器 */
 export async function getVersions(req: Request, res: Response): Promise<void> {
@@ -657,6 +661,121 @@ export async function addFile(req: Request, res: Response): Promise<void> {
   }
 
   res.status(201).json(newFile);
+}
+
+/**
+ * 從平台（CF / Modrinth）下載單一版本檔案並加入 draft 版本（F13a-3）。
+ *
+ * 複用進池管線（cf_file_hashes 快取 / headObject 免下載 / 全域併發 16 / 順路 metadata），
+ * 寫入語意比照 addFile §12.8（同 dest_path 替換、沿用原 id / policy / disabled）。
+ * 僅允許 draft（published → 409）；上游取檔或下載失敗 → 502 且不動 draft_files。
+ */
+export async function addFileFromPlatform(req: Request, res: Response): Promise<void> {
+  const { serverId, versionId } = req.params;
+  const { source, projectId, versionId: platformVersionId } = req.body;
+
+  if (source !== "curseforge" && source !== "modrinth") {
+    res.status(400).json({ message: "source 僅接受 curseforge | modrinth" });
+    return;
+  }
+  if (!projectId || !platformVersionId) {
+    res.status(400).json({ message: "projectId 與 versionId 為必填" });
+    return;
+  }
+
+  const [vRows]: any = await Mysql.getPool().query(
+    "SELECT status, draft_files FROM server_modpack_versions WHERE id = ? AND server_id = ?",
+    [versionId, serverId]
+  );
+  if (!vRows.length) { res.status(404).json({ message: "找不到該版本" }); return; }
+  // published guard：比照 restoreFile/updateFilePolicy 用 409（addFile 用 400，屬既有慣例差異）。
+  if (vRows[0].status !== "draft") {
+    res.status(409).json({ code: "Conflict", message: "只能對 draft 版本新增檔案" });
+    return;
+  }
+
+  if (source === "curseforge" && !config.curseforgeKey) {
+    res.status(503).json({ code: "ServiceUnavailable", message: "CurseForge 服務未設定" });
+    return;
+  }
+
+  // 取平台檔案資訊 → 進池（上游/下載失敗一律 502，不寫 draft_files，不建半殘 entry）。
+  let pool: { sha256: string; url: string; size: number };
+  let fileName: string;
+  const limiter = createImportLimiter();
+  try {
+    if (source === "curseforge") {
+      const info = await platformCurseforgeService.getVersionFile(
+        String(projectId),
+        String(platformVersionId)
+      );
+      fileName = info.fileName;
+      // downloadUrl 為 null 原樣傳入 → pool 走 forgecdn 慣例重建（非直接 502）。
+      pool = await ensureCurseforgeFileInPool(
+        { fileId: info.fileId!, fileName: info.fileName, downloadUrl: info.downloadUrl },
+        config.curseforgeKey,
+        limiter
+      );
+    } else {
+      const info = await platformModrinthService.getVersionFile(String(platformVersionId));
+      fileName = info.fileName;
+      pool = await ensureModrinthFileInPool(
+        {
+          path: info.fileName,
+          hashes: { sha256: info.sha256 },
+          downloads: [info.url],
+          fileSize: info.size,
+        },
+        limiter
+      );
+    }
+  } catch (err) {
+    const message = err instanceof PoolResolveError ? err.message : (err as Error).message;
+    res.status(502).json({ code: "BadGateway", message: `平台檔案取得失敗：${message}` });
+    return;
+  }
+
+  // §12.8：同 dest_path 已存在則替換（沿用原 id 保引用穩定），否則追加、file_count + 1。
+  const destPath = `mods/${fileName}`;
+  const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
+  const idx = files.findIndex((f) => f.dest_path === destPath);
+  const existing = idx !== -1 ? files[idx] : null;
+
+  // body 不帶 policy/disabled → 沿用原 entry（無原 entry 則缺省 enforced / 未停用）。
+  const resolvedPolicy = existing?.policy;
+  const resolvedDisabled = existing?.disabled;
+  const newFile: any = {
+    id: existing ? existing.id : crypto.randomUUID(),
+    version_id: versionId,
+    file_name: fileName,
+    dest_path: destPath,
+    file_url: pool.url,
+    file_hash: pool.sha256,
+    file_size_bytes: pool.size,
+    ...(resolvedPolicy ? { policy: resolvedPolicy } : {}),
+    ...(resolvedDisabled ? { disabled: true } : {}),
+  };
+
+  if (existing) {
+    files[idx] = newFile;
+    await Mysql.getPool().query(
+      "UPDATE server_modpack_versions SET draft_files = ? WHERE id = ?",
+      [JSON.stringify(files), versionId]
+    );
+  } else {
+    files.push(newFile);
+    await Mysql.getPool().query(
+      "UPDATE server_modpack_versions SET draft_files = ?, file_count = file_count + 1 WHERE id = ?",
+      [JSON.stringify(files), versionId]
+    );
+  }
+
+  // 回傳補上明確 policy / disabled（規格 §3.4-5）。
+  res.status(201).json({
+    ...newFile,
+    policy: newFile.policy ?? "enforced",
+    disabled: newFile.disabled === true,
+  });
 }
 
 /** 從版本移除檔案（不刪除 S3 上的物件，只允許 draft 版本） */
