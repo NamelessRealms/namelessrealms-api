@@ -5,7 +5,7 @@
 
 任務代號：`f13a3-platform-browse-import`｜主要變更 repo：**namelessrealms-api（單一 repo，developers 分支）**
 性質：CF/Modrinth 瀏覽 proxy（淨新增）+ 單檔匯入（複用 cf-hash-and-global-pool 既有管線）。
-完成 F 編號：**F13a-3**（狀態 → local green；**remote Actions 與真機驗證待人工**，見「CI」「真機驗證」段）。前端/Tauri 橋接屬 **F13a-4**、整包匯入屬 **F15**、mod_id 反向解析屬 F13a-4，本任務未做（守界）。
+完成 F 編號：**F13a-3**（狀態 → local green + **remote Actions green**（run 29639262003）；**真機驗證仍待人工**，見「CI」「真機驗證」段）。前端/Tauri 橋接屬 **F13a-4**、整包匯入屬 **F15**、mod_id 反向解析屬 F13a-4，本任務未做（守界）。
 
 ## 變更檔案
 
@@ -71,8 +71,9 @@ Test Files  17 passed (17)
 ## CI
 
 - 本地：`yarn test`（vitest run，119 綠）+ `yarn build`（tsc 綠）→ **local green**。
-- 遠端 Actions：**待人工**。本次未 push（依協作慣例，commit 計畫需先與用戶確認）。push 後補 run 連結與 conclusion。
-- 狀態措辭：目前 **local green**；remote Actions 綠與否**待 push 後確認**，未達則任務不算完成。
+- 遠端 Actions：**綠**（`CI` run，conclusion=success，`gh run view` 確認）。
+  run：https://github.com/NamelessRealms/namelessrealms-api/actions/runs/29639262003 （headSha `474d9f9`）
+- 狀態措辭：**local green + remote Actions green**。（真機段仍待人工，見下。）
 
 ## 真機驗證（待人工）
 
@@ -100,11 +101,14 @@ Test Files  17 passed (17)
 
 全域「下載+雜湊」併發上限 16 由 pool 層模組級單例 `globalSemaphore = new Semaphore(GLOBAL_CONCURRENCY=16)` 內建，罩住所有匯入。from-platform 每次呼叫建的 `createImportLimiter()`（`PER_IMPORT_CONCURRENCY=8`）僅為該次匯入的內層限流，其受限工作最終仍經 `globalSemaphore.run(...)`（見 `pool.ts` `ensureCurseforgeFileInPool`/`ensureModrinthFileInPool` 內 `limiter(() => globalSemaphore.run(...))`），故 per-request limiter **不會使全域 16 上限失效**。
 
-## git 對帳（待 commit/push 後回填）
+## git 對帳
 
 ```
-git log --oneline -3            → 待 commit
-git status                      → 本任務 11 檔（3 改 + 8 新）+ .gitignore 一行（非本任務）
-git rev-parse HEAD              → 待 commit
-git rev-parse origin/developers → 待 push 後核對本地＝遠端
+git log --oneline -3            → 474d9f9 docs: F13a-3 驗收報告（local green，Actions 與真機待人工）
+                                  1c5a8ae feat: F13a-3 模組平台瀏覽 proxy + 單檔匯入端點（CF/Modrinth ... + from-platform）
+                                  deb4993 docs: F13a-2 git 對帳回填（HEAD＝origin b6f2fab）
+git status                      → 乾淨（.gitignore 的 .claude/settings.local.json 一行屬設定配套，未納本任務 commit）
+git rev-parse HEAD              → 474d9f94a90adb6da8530b00f24ccad96a719ead
+git rev-parse origin/developers → 474d9f94a90adb6da8530b00f24ccad96a719ead（本地＝遠端）
 ```
+（本 git 對帳於 474d9f9 push 後驗證；本區塊之回填為其後的 docs-only commit，不改任何程式碼。真機段回填另計。）
