@@ -341,6 +341,20 @@ export default class ServerRouter extends IRoutes {
         )
       );
 
+    // 注意：files/:fileId/content 必須在 files/:fileId 之前，避免 "content" 段落解析歧義
+    this._routers
+      .route("/:serverId/modpack-versions/:versionId/files/:fileId/content")
+      .get(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.getFileContent(req, res))
+      )
+      .put(
+        this._authJwtVerify.verifyToken,
+        requirePermission(Permission.MANAGE_SERVER),
+        asyncHandler((req: Request, res: Response) => modpackController.updateFileContent(req, res))
+      );
+
     this._routers
       .route("/:serverId/modpack-versions/:versionId/files/:fileId")
       .patch(

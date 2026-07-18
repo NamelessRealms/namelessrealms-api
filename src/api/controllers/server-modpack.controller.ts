@@ -31,7 +31,13 @@ import path from "path";
 import AdmZip from "adm-zip";
 import { Request, Response } from "express";
 import Mysql from "../utils/mysql";
-import { uploadToS3 } from "../utils/s3/s3";
+import {
+  uploadToS3,
+  getObjectBuffer,
+  headObjectExists,
+  keyFromUrl,
+  publicUrlForKey,
+} from "../utils/s3/s3";
 import { config } from "../../config/config.service";
 import {
   createImportLimiter,
@@ -937,4 +943,132 @@ export async function updateFilePolicy(req: Request, res: Response): Promise<voi
 
   files.sort((a, b) => (a.dest_path as string).localeCompare(b.dest_path));
   res.json(files.map((f) => ({ ...f, policy: f.policy ?? "enforced", disabled: f.disabled === true })));
+}
+
+/** 可編輯設定檔的位元組上限（UTF-8 編碼後長度）；讀寫兩端皆守門。 */
+const MAX_EDITABLE_BYTES = 256 * 1024;
+
+/**
+ * 讀取版本中單一檔案的文字內容（供分割編輯器；draft 與 published 皆可讀）。
+ *
+ * entry 由 draft_files 全量以 fileId 定址（不套 getFiles 的 manifest fallback，
+ * 故 draft_files 空的舊 published 版會落在「找不到該檔案」→ 404，屬已知限制）。
+ * 守門先查後讀：size 超限先擋、省下不必要的 getObject；讀回內容含 null byte 視為二進位。
+ *
+ * @param req - Express Request（params: serverId, versionId, fileId）
+ * @param res - Express Response
+ */
+export async function getFileContent(req: Request, res: Response): Promise<void> {
+  const { serverId, versionId, fileId } = req.params;
+
+  const [vRows]: any = await Mysql.getPool().query(
+    "SELECT status, draft_files FROM server_modpack_versions WHERE id = ? AND server_id = ?",
+    [versionId, serverId]
+  );
+  if (!vRows.length) { res.status(404).json({ message: "找不到該版本" }); return; }
+
+  const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
+  const entry = files.find((f) => f.id === fileId);
+  if (!entry) { res.status(404).json({ message: "找不到該檔案" }); return; }
+
+  // 先查後讀：entry.size 超限直接擋，不觸發 getObject。
+  if (entry.file_size_bytes > MAX_EDITABLE_BYTES) {
+    res.status(422).json({ message: `檔案超過可編輯上限 ${MAX_EDITABLE_BYTES} 位元組，無法於編輯器開啟` });
+    return;
+  }
+
+  const key = keyFromUrl(entry.file_url);
+  if (!key) { res.status(422).json({ message: "無法解析檔案位址" }); return; }
+  const buf = await getObjectBuffer(key);
+
+  // 含 null byte 視為二進位，不可編輯。
+  if (buf.includes(0)) {
+    res.status(422).json({ message: "二進位檔（含 null byte）不可於編輯器編輯" });
+    return;
+  }
+
+  res.json({
+    content: buf.toString("utf8"),
+    sha256: entry.file_hash,
+    size: entry.file_size_bytes,
+  });
+}
+
+/**
+ * 以替換語意寫入版本中單一檔案的文字內容（§12.8 內容版）。
+ *
+ * 新內容 → 新 sha256 → 上傳至 server 隔離路徑 `modpacks/{serverId}/files/{sha256}{ext}`
+ * （不進全域池，天然不寫 modpack_file_refs）→ 就地替換 entry（沿用原 id，保 policy/disabled，
+ * file_count 不變）。附樂觀鎖（baseSha256）與大小/二進位守門；新 hash 等於舊值時為冪等 no-op。
+ * published 版唯讀（→ 409）；停用檔（disabled）仍允許編輯（authoring record 語意）。
+ *
+ * @param req - Express Request（params: serverId, versionId, fileId；body: content, baseSha256）
+ * @param res - Express Response
+ */
+export async function updateFileContent(req: Request, res: Response): Promise<void> {
+  const { serverId, versionId, fileId } = req.params;
+  const { content, baseSha256 } = req.body;
+
+  // content 允許空字串，故以型別判定必填（非 falsy）。
+  if (typeof content !== "string" || typeof baseSha256 !== "string") {
+    res.status(400).json({ message: "content 與 baseSha256 為必填字串" });
+    return;
+  }
+
+  const [vRows]: any = await Mysql.getPool().query(
+    "SELECT status, draft_files FROM server_modpack_versions WHERE id = ? AND server_id = ?",
+    [versionId, serverId]
+  );
+  if (!vRows.length) { res.status(404).json({ message: "找不到該版本" }); return; }
+  if (vRows[0].status !== "draft") {
+    res.status(409).json({ code: "Conflict", message: "已發布版本唯讀，請先建立草稿再編輯" });
+    return;
+  }
+
+  const files: any[] = JSON.parse(vRows[0].draft_files || "[]");
+  const idx = files.findIndex((f) => f.id === fileId);
+  if (idx === -1) { res.status(404).json({ message: "找不到該檔案" }); return; }
+
+  const size = Buffer.byteLength(content, "utf8");
+  if (size > MAX_EDITABLE_BYTES) {
+    res.status(422).json({ message: `內容超過可編輯上限 ${MAX_EDITABLE_BYTES} 位元組` });
+    return;
+  }
+  if (content.includes("\0")) {
+    res.status(422).json({ message: "內容含 null byte，不可儲存為文字檔" });
+    return;
+  }
+
+  const entry = files[idx];
+  if (baseSha256 !== entry.file_hash) {
+    res.status(409).json({ code: "Conflict", message: "檔案已被他人變更，請重新載入後再儲存" });
+    return;
+  }
+
+  const buffer = Buffer.from(content, "utf8");
+  const newSha = crypto.createHash("sha256").update(buffer).digest("hex");
+
+  // 新內容 hash 等於現值 → 冪等 no-op：不上傳、entry 不動。
+  if (newSha === entry.file_hash) {
+    res.json({ sha256: newSha, size });
+    return;
+  }
+
+  const ext = path.extname(entry.dest_path);
+  const key = `modpacks/${serverId}/files/${newSha}${ext}`;
+  // headObject 命中則跳過上傳（同 key 同內容），URL 仍沿用該 key。
+  const url = (await headObjectExists(key))
+    ? publicUrlForKey(key)
+    : await uploadToS3(key, buffer, "text/plain; charset=utf-8");
+
+  // 就地替換：更新 url/hash/size，其餘欄位（id/policy/disabled/dest_path/file_name/version_id）原樣保留。
+  entry.file_url = url;
+  entry.file_hash = newSha;
+  entry.file_size_bytes = size;
+  await Mysql.getPool().query(
+    "UPDATE server_modpack_versions SET draft_files = ? WHERE id = ?",
+    [JSON.stringify(files), versionId]
+  );
+
+  res.json({ sha256: newSha, size });
 }

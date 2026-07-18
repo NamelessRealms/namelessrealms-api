@@ -11,6 +11,7 @@
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
@@ -107,6 +108,20 @@ export async function headObjectExists(key: string): Promise<boolean> {
     }
     throw err;
   }
+}
+
+/**
+ * 以 getObject 讀回指定 key 的物件內容（不走公開 HTTP 下載，不依賴 public ACL）。
+ *
+ * 供伺服器隔離路徑（`modpacks/{serverId}/files/...`）的設定檔內容編輯讀取使用。
+ *
+ * @param key - 要讀取的物件 key
+ * @returns 物件位元組內容
+ */
+export async function getObjectBuffer(key: string): Promise<Buffer> {
+  const resp = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const bytes = await (resp.Body as any).transformToByteArray();
+  return Buffer.from(bytes);
 }
 
 /**
