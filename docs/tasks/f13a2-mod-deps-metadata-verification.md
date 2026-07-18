@@ -5,7 +5,7 @@
 
 任務代號：`f13a2-mod-deps-metadata`｜主要變更 repo：**namelessrealms-api（單一 repo，developers 分支）**
 性質：F29（mod metadata 服務）增量擴充。依賴 F29 已收案。
-完成 F 編號：**F13a-2 / F29b**（狀態 → done 待遠端 Actions 綠）。前端「常駐依賴健檢」UI 屬 **F13a-4**、依賴解析為平台專案屬 **F13a-3**，本任務未做（守界）。
+完成 F 編號：**F13a-2 / F29b**（狀態 → done；local green + remote Actions green + dev 真機 backfill 完成）。前端「常駐依賴健檢」UI 屬 **F13a-4**、依賴解析為平台專案屬 **F13a-3**，本任務未做（守界）。
 
 ## 變更檔案
 **修改**
@@ -42,20 +42,36 @@
 - [x] backfill 腳本在 repo 根、不在 `tsconfig` `include`（`["src"]`）內 → 另跑 `npx tsc --noEmit`（同 CJS/es2015 旗標）單獨型別檢查，exit 0。
 - 註：`yarn build` 的 `outputVersion` 步驟會覆寫 `src/version.ts` 剝除檔頭註解（**既有建置行為、非本任務改動**）；已 `git checkout src/version.ts` 還原，保持本次 diff 聚焦。
 
-## carryover（部署動作，未在本驗收執行）
-1. **dev/prod DB 手動 ALTER**（無 migration runner；`CREATE TABLE IF NOT EXISTS` 不會 ALTER 既有表）：
+## carryover
+1. **dev DB 手動 ALTER —— 已套用**（用戶確認執行）：
    ```sql
    ALTER TABLE `mod_metadata` ADD COLUMN `deps` JSON NULL AFTER `icon_url`;
    ```
-2. **真實池 deps 回填**：`ts-node backfill_mod_metadata.ts --deps`（dry-run 掃描）→ `--deps --confirm`（實跑）。**須 dev DB 先套用上述 ALTER 才能跑**（否則 `loadDepsPending` 的 `deps IS NULL` 查詢對不存在欄位報錯）。
+2. **prod DB 手動 ALTER —— 仍待部署套用**（無 migration runner；`CREATE TABLE IF NOT EXISTS` 不會 ALTER 既有表）。同上 SQL。
 
-## 待人工（真機/部署環境才能執行——本機無 dev DB `deps` 欄 + S3 憑證，誠實標記，不以推理冒充）
-- [ ] **dev DB 套用 carryover ①的 ALTER**。
-- [ ] **`--deps` dry-run 掃描數**（待補值 row 計數）入報告。
-- [ ] **`--deps --confirm` 實跑輸出**入報告。
-- [ ] **≥3 筆已知模組 deps 抽樣核對合理性**（以池內實際存在者為準；若有 Sodium Extra → 含 `sodium`，無則任選 3 筆已知模組）。
-- [ ] **真機核對 mysql2 對 `deps` JSON 欄回傳型別**（array vs 字串）；若為字串，確認 `normalizeDepsColumn` 防禦路徑生效並記入。
-- [ ] **遠端 Actions 綠**（附 run 連結）——待 push 後確認。
+## 真機 backfill 實跑（dev DB，deps 欄已套用）
+- **`--deps` dry-run 掃描**（read-only）：
+  ```
+  掃描全域池前綴：mods/files/（模式：deps 補值）
+  待補 deps 的 .jar 物件數（mod_name 非 NULL 且 deps IS NULL）：360
+  [dry-run] 未下載/解析任何物件。加 --confirm 才真跑。
+  ```
+- **`--deps --confirm` 實跑**：
+  ```
+  待補 deps 的 .jar 物件數（mod_name 非 NULL 且 deps IS NULL）：360
+  --confirm 已指定，開始下載 + 解析（併發 4）…
+  完成，共嘗試處理 360 個物件（下載失敗者未落值）。
+  ```
+  實跑統計：**已處理 360 筆、真實下載失敗 0 筆**。
+- **回填後覆蓋統計**（`mod_name` 非 NULL 者）：`{total: 360, with_deps: 360, null_deps: 0}` —— 全數落值、無殘留 NULL。
+- **≥3 筆已知模組 deps 抽樣核對**（池內實際存在者；無 Sodium Extra，取 Sodium Options 系與 Chipped）：
+  ```
+  [neoforge] name="Sodium Options Mod Compat" id=sodiumoptionsmodcompat deps=["sodiumoptionsapi"]
+  [neoforge] name="Sodium Options API"        id=sodiumoptionsapi       deps=["reeses_sodium_options"]
+  [fabric]   name="Reintegrated Chipped"      id=reintegrated_chipped   deps=["chipped","fabric-api","lithostitched"]
+  ```
+  皆合理；Reintegrated Chipped 帶 `fabric-api` 佐證**系統 id 過濾未誤濾 fabric-api**（真實資料驗證）。
+- **mysql2 對 `deps` JSON 欄回傳型別**：實測 `typeof=object, isArray=true`（`value=["puzzleslib","diagonalblocks"]`）—— mysql2 **已自動 parse 為 array**；`normalizeDepsColumn` 的 array 分支為 live 路徑，字串分支僅為防禦（真機未觸發，無害保留）。
 
 ## git 對帳
 ```
@@ -64,8 +80,9 @@
 
 ## CI
 - 本地：`yarn test`（vitest run，96 綠）+ `yarn build`（tsc 綠）+ backfill `tsc --noEmit`（exit 0）→ **local green**。
-- 遠端 Actions：**待人工**（push 後以 `gh run view` 確認 conclusion=success 再回填 run 連結）。
-- 狀態措辭：目前僅 **local green**；未把本地綠當「CI 通過」。
+- 遠端 Actions：**綠**（`CI` run，conclusion=success，`gh run view` 確認）。
+  run：https://github.com/NamelessRealms/namelessrealms-api/actions/runs/29635786160 （commit `031dbf2`）
+- 狀態措辭：**local green + remote Actions green**。
 
 ## 回歸守門
 - 既有 13 檔測試全綠，`tests/modpool/` 與 F29 既有 `tests/mods/` 契約未破壞。
