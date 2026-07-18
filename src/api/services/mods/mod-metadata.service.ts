@@ -16,6 +16,28 @@ export interface ModMetadataView {
   mod_version: string | null;
   loader_hint: string | null;
   icon_url: string | null;
+  /** 必要依賴 mod id 清單；[]=有解析無依賴、null=解析失敗（未落值） */
+  deps: string[] | null;
+}
+
+/**
+ * 將 DB 讀出的 deps 欄正規化為 `string[] | null`。
+ * mysql2 對 JSON 欄多半已 parse 為 array，但保守處理字串形（真機若回字串亦不失準）。
+ *
+ * @param raw - DB 讀出的 deps 欄值
+ */
+function normalizeDepsColumn(raw: unknown): string[] | null {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw as string[];
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
@@ -50,7 +72,7 @@ export async function captureModMetadata(sha256: string, buffer: Buffer, ext: st
     }
 
     await Mysql.getPool().query(
-      "INSERT IGNORE INTO mod_metadata (sha256, mod_id, mod_name, mod_version, loader_hint, icon_url) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT IGNORE INTO mod_metadata (sha256, mod_id, mod_name, mod_version, loader_hint, icon_url, deps) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [
         sha256,
         parsed?.mod_id ?? null,
@@ -58,6 +80,7 @@ export async function captureModMetadata(sha256: string, buffer: Buffer, ext: st
         parsed?.mod_version ?? null,
         parsed?.loader_hint ?? null,
         iconUrl,
+        parsed ? JSON.stringify(parsed.deps) : null,
       ]
     );
   } catch (err) {
@@ -99,7 +122,7 @@ export async function lookupModMetadata(hashes: string[]): Promise<Record<string
   if (!hashes.length) return {};
 
   const [rows]: any = await Mysql.getPool().query(
-    "SELECT sha256, mod_id, mod_name, mod_version, loader_hint, icon_url FROM mod_metadata WHERE sha256 IN (?) AND mod_name IS NOT NULL",
+    "SELECT sha256, mod_id, mod_name, mod_version, loader_hint, icon_url, deps FROM mod_metadata WHERE sha256 IN (?) AND mod_name IS NOT NULL",
     [hashes]
   );
 
@@ -111,7 +134,30 @@ export async function lookupModMetadata(hashes: string[]): Promise<Record<string
       mod_version: r.mod_version,
       loader_hint: r.loader_hint,
       icon_url: r.icon_url,
+      deps: normalizeDepsColumn(r.deps),
     };
   }
   return out;
+}
+
+/**
+ * 對既有 row 補解依賴：重解 jar 後僅更新 deps 欄（不動其他欄位）。供 backfill deps 模式用。
+ *
+ * `WHERE deps IS NULL` guard 使其冪等可重跑；parseModJar 回 null（罕見：曾成功、re-parse 失敗）
+ * 則不覆蓋、留 NULL 可重試。best-effort try-catch 吞錯（與服務其餘一致）。
+ *
+ * @param sha256 - 池物件內容雜湊（須已存在對應 row）
+ * @param buffer - 重新下載的 jar 位元組
+ */
+export async function backfillModDeps(sha256: string, buffer: Buffer): Promise<void> {
+  try {
+    const parsed = parseModJar(buffer);
+    if (!parsed) return;
+    await Mysql.getPool().query(
+      "UPDATE mod_metadata SET deps = ? WHERE sha256 = ? AND deps IS NULL",
+      [JSON.stringify(parsed.deps), sha256]
+    );
+  } catch (err) {
+    console.error(`[mod-metadata] deps 回填失敗（best-effort，已吞）sha256=${sha256}:`, err);
+  }
 }

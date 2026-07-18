@@ -151,3 +151,67 @@ describe("parseModJar", () => {
     expect(parseModJar(makeJar({ "README.txt": "hello" }))).toBeNull();
   });
 });
+
+describe("parseModJar — deps 依賴抽取", () => {
+  it("fabric：depends keys 抽取，recommends/suggests 不取；fabric-api 不被濾、系統 id 被濾", () => {
+    const jar = makeJar({
+      "fabric.mod.json": JSON.stringify({
+        id: "m",
+        version: "1",
+        depends: { minecraft: ">=1.20", java: ">=17", fabricloader: "*", "fabric-api": "*", sodium: "*" },
+        recommends: { cloth: "*" },
+        suggests: { jei: "*" },
+      }),
+    });
+    expect(parseModJar(jar)?.deps).toEqual(["fabric-api", "sodium"]);
+  });
+
+  it("quilt：depends 支援 string 與 {id, optional}；optional 排除；去重 + 小寫", () => {
+    const jar = makeJar({
+      "quilt.mod.json": JSON.stringify({
+        quilt_loader: {
+          id: "q",
+          version: "1",
+          metadata: { name: "Q" },
+          depends: ["Sodium", { id: "sodium" }, { id: "clothconfig", optional: true }, { id: "quilt_base" }],
+        },
+      }),
+    });
+    expect(parseModJar(jar)?.deps).toEqual(["sodium"]);
+  });
+
+  it("neoforge：[[dependencies.<modid>]] type==\"required\" 取、optional 不取", () => {
+    const jar = makeJar({
+      "META-INF/neoforge.mods.toml":
+        '[[mods]]\nmodId="neomod"\nversion="1"\n' +
+        '[[dependencies.neomod]]\nmodId="sodium"\ntype="required"\n' +
+        '[[dependencies.neomod]]\nmodId="cloth"\ntype="optional"\n' +
+        '[[dependencies.neomod]]\nmodId="minecraft"\ntype="required"\n',
+    });
+    expect(parseModJar(jar)?.deps).toEqual(["sodium"]);
+  });
+
+  it("forge mods.toml：[[dependencies.<modid>]] mandatory==true 取、false 不取", () => {
+    const jar = makeJar({
+      "META-INF/mods.toml":
+        '[[mods]]\nmodId="forgemod"\nversion="1"\n' +
+        '[[dependencies.forgemod]]\nmodId="jei"\nmandatory=true\n' +
+        '[[dependencies.forgemod]]\nmodId="optlib"\nmandatory=false\n',
+    });
+    expect(parseModJar(jar)?.deps).toEqual(["jei"]);
+  });
+
+  it("legacy：requiredMods 全為必要，@ 版本後綴切除、系統 id 被濾", () => {
+    const jar = makeJar({
+      "mcmod.info": JSON.stringify([
+        { modid: "m", name: "M", requiredMods: ["JEI@[15.0,)", "forge@[47,)", "sodium"] },
+      ]),
+    });
+    expect(parseModJar(jar)?.deps).toEqual(["jei", "sodium"]);
+  });
+
+  it("有解析、無依賴 → deps 為 []", () => {
+    const jar = makeJar({ "fabric.mod.json": JSON.stringify({ id: "m", version: "1" }) });
+    expect(parseModJar(jar)?.deps).toEqual([]);
+  });
+});

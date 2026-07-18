@@ -12,5 +12,8 @@ CREATE TABLE IF NOT EXISTS `mod_metadata` (
   `mod_version` VARCHAR(64)  NULL,                   -- 版本（Gradle 佔位符殘留視為 NULL）
   `loader_hint` VARCHAR(16)  NULL,                   -- 'fabric'|'quilt'|'neoforge'|'forge'|'legacy'|NULL
   `icon_url`    VARCHAR(512) NULL,                   -- S3 mods/icons/{sha256}.png；無 icon 為 NULL
+  `deps`        JSON         NULL,                   -- 必要依賴 mod id 清單；[]=有解析無依賴、NULL=解析失敗
   `parsed_at`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP  -- 解析嘗試時間
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- carryover：CREATE TABLE IF NOT EXISTS 不會 ALTER 既有表；dev/prod 需手動：
+--   ALTER TABLE `mod_metadata` ADD COLUMN `deps` JSON NULL AFTER `icon_url`;
