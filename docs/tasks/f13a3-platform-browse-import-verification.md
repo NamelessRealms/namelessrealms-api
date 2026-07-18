@@ -78,8 +78,10 @@ Test Files  17 passed (17)
 ## CI
 
 - 本地：`yarn test`（vitest run，120 綠）+ `yarn build`（tsc 綠）→ **local green**。
-- 遠端 Actions：初版（platform 端點）run 29639262003 綠（headSha `474d9f9`）；**Modrinth sha512 修正輪的 run 連結待本輪 push 後回填**。
-- 狀態措辭：目前 **local green**；Modrinth 修正輪 remote Actions 綠待 push 後確認。
+- 遠端 Actions：**綠**（conclusion=success，`gh run view` 確認）。
+  - platform 端點輪：https://github.com/NamelessRealms/namelessrealms-api/actions/runs/29639262003 （headSha `474d9f9`）
+  - Modrinth sha512 修正輪：https://github.com/NamelessRealms/namelessrealms-api/actions/runs/29640432908 （headSha `661b922`）
+- 狀態措辭：**local green + remote Actions green**。
 
 ## 真機驗證（已執行；dev DB + 真實 CF key + Modrinth）
 
@@ -121,9 +123,13 @@ Test Files  17 passed (17)
 
 ## git 對帳
 
-初版（platform 端點）已於 `474d9f9` push、Actions 綠。**Modrinth sha512 修正輪的 git 對帳待本輪 push 後回填**（`git rev-parse HEAD` ＝ `origin/developers`）。前一輪對帳：
 ```
-1c5a8ae feat: F13a-3 模組平台瀏覽 proxy + 單檔匯入端點（CF/Modrinth ... + from-platform）
-474d9f9 docs: F13a-3 驗收報告
-（原 474d9f9 push 後 HEAD＝origin/developers；本輪新增 Modrinth 修正 commit 待 push）
+git log --oneline -4            → 661b922 docs: F13a-3 Modrinth sha512 修正 + CF/Modrinth 真機完整流回填
+                                  95a9e6a fix: F13a-3 Modrinth 進池改用 sha512 完整性核對（…順帶修既有 importVersion Modrinth 路徑）
+                                  99ac922 docs: F13a-3 CI run 連結與 git 對帳回填
+                                  474d9f9 docs: F13a-3 驗收報告
+git status                      → 乾淨（.gitignore 的 .claude/settings.local.json 一行屬設定配套，未納本任務 commit）
+git rev-parse HEAD              → 661b922af79d84528f9842b2a8d6c61237ff41c1
+git rev-parse origin/developers → 661b922af79d84528f9842b2a8d6c61237ff41c1（本地＝遠端）
 ```
+（本 git 對帳於 `661b922` push 後驗證；本區塊之最終回填為其後的 docs-only commit，不改任何程式碼。）
