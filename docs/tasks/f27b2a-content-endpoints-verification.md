@@ -94,16 +94,18 @@ Done in 2.75s.
 ## 4. Remote CI（Actions）
 
 - 觸發：push `developers` → workflow `CI`（`yarn test` + `yarn build`）。
-- Run 連結：**（待 push 後回填）**
-- 狀態：**（待回填）** — Actions 紅則本任務不算完成。
+- Run 連結：https://github.com/NamelessRealms/namelessrealms-api/actions/runs/29649880678
+- 狀態：**✅ success（綠）**，headSha `0728ffe2ada965622165c25eac57e9a8c63c5c89`。
+  - 註：run 內有一則 annotation「Node.js 20 is deprecated（強制改跑 Node 24）」——GitHub runner 環境警告，非本任務測試/建置失敗。
 
 ---
 
-## 5. Git 三步對帳（待 push 後回填）
+## 5. Git 三步對帳
 
 - `git add`：`src/api/utils/s3/s3.ts`、`src/api/controllers/server-modpack.controller.ts`、`src/api/routes/server.routes.ts`、`tests/modpool/f27b2a-content.test.ts`、`docs/tasks/f27b2a-content-endpoints-verification.md`
-- commit hash：（待回填）
-- push / remote SHA：（待回填）
+- feature commit：`0728ffe2ada965622165c25eac57e9a8c63c5c89`
+- push：`a560db5..0728ffe  developers -> developers`（remote SHA = `0728ffe`）
+- docs 回填 commit（本報告 §4/§5）：見後續補推 commit（於 feature commit 之後）。
 
 ---
 
