@@ -719,10 +719,11 @@ export async function addFileFromPlatform(req: Request, res: Response): Promise<
     } else {
       const info = await platformModrinthService.getVersionFile(String(platformVersionId));
       fileName = info.fileName;
+      // Modrinth 只給 sha512；池下載後親算 sha256、以 sha512 核對（見 ensureModrinthFileInPool）。
       pool = await ensureModrinthFileInPool(
         {
           path: info.fileName,
-          hashes: { sha256: info.sha256 },
+          hashes: { sha512: info.sha512 },
           downloads: [info.url],
           fileSize: info.size,
         },

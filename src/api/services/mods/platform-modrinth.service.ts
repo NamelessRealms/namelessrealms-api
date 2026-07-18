@@ -140,9 +140,10 @@ export default class PlatformModrinthService {
     });
     const file = primaryFile(res.body ?? {});
     if (!file) throw new Error("Modrinth 版本無可用檔案");
+    // Modrinth 只提供 sha512/sha1；池下載後親算 sha256，以此 sha512 做完整性核對。
     return {
       fileName: file.filename ?? "",
-      sha256: String(file.hashes?.sha256 ?? "").toLowerCase(),
+      sha512: String(file.hashes?.sha512 ?? "").toLowerCase(),
       url: file.url,
       size: Number(file.size ?? 0),
     };

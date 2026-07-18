@@ -161,21 +161,27 @@ function poolKey(sha256: string, ext: string): string {
 }
 
 /**
- * 串流下載至暫存檔並邊下載邊算 sha256（不整檔進記憶體）。
+ * 串流下載至暫存檔並邊下載邊算雜湊（不整檔進記憶體）。
+ *
+ * 一律算 sha256（池 key 用）；`opts.sha512` 為真時另算 sha512（Modrinth 完整性核對用）。
  *
  * @param url 下載 URL
  * @param headers 額外 header（forgecdn 需帶 `x-api-key`）
- * @returns sha256、位元組數與暫存檔路徑（呼叫端負責刪除）
+ * @param opts.sha512 是否另算 sha512
+ * @returns sha256、（選）sha512、位元組數與暫存檔路徑（呼叫端負責刪除）
  */
 async function downloadAndHashToTemp(
   url: string,
-  headers: Record<string, string>
-): Promise<{ sha256: string; size: number; tmpPath: string }> {
+  headers: Record<string, string>,
+  opts: { sha512?: boolean } = {}
+): Promise<{ sha256: string; sha512?: string; size: number; tmpPath: string }> {
   const tmpPath = path.join(os.tmpdir(), `modpool-${crypto.randomUUID()}.tmp`);
-  const hash = crypto.createHash("sha256");
+  const hash256 = crypto.createHash("sha256");
+  const hash512 = opts.sha512 ? crypto.createHash("sha512") : null;
   const hasher = new Transform({
     transform(chunk, _enc, cb) {
-      hash.update(chunk);
+      hash256.update(chunk);
+      if (hash512) hash512.update(chunk);
       cb(null, chunk);
     },
   });
@@ -194,7 +200,12 @@ async function downloadAndHashToTemp(
   }
 
   const { size } = await fs.promises.stat(tmpPath);
-  return { sha256: hash.digest("hex"), size, tmpPath };
+  return {
+    sha256: hash256.digest("hex"),
+    sha512: hash512 ? hash512.digest("hex") : undefined,
+    size,
+    tmpPath,
+  };
 }
 
 /** 查 CF 快取表（後端親算值） */
@@ -291,59 +302,57 @@ export async function ensureCurseforgeFileInPool(
 /**
  * 確保 Modrinth 檔案已進全域池，回傳 sha256 + 池 url。
  *
- * Modrinth API 直接給 sha256 → 先 headObject（命中連下載都免）；未命中才下載，
- * 並親算 sha256 與 API 值核對（不符報錯）後上傳池。
+ * Modrinth API 只提供 sha512/sha1（**不含 sha256**），而池以 sha256 內容定址，故無法先以
+ * sha256 headObject 免下載：一律串流下載 → 親算 sha256（當池 key）與 sha512，再以 API 的
+ * sha512 做完整性核對（不符報錯）；池 key 未命中才上傳。in-flight 去重以 API sha512 為鍵。
  *
- * @param f Modrinth index 的檔案項（path / hashes.sha256 / downloads / fileSize）
+ * @param f Modrinth index 的檔案項（path / hashes.sha512 / downloads / fileSize）
  * @param limiter 單一匯入的併發限流器
- * @throws {PoolResolveError} 缺 sha256/下載連結、下載失敗、親算與 API 值不符
+ * @throws {PoolResolveError} 缺 sha512/下載連結、下載失敗、親算 sha512 與 API 值不符
  */
 export async function ensureModrinthFileInPool(
   f: any,
   limiter: Limiter
 ): Promise<PoolFile> {
   const fileName = path.basename(f.path ?? "");
-  const apiSha256 = String(f.hashes?.sha256 ?? "").toLowerCase();
+  const apiSha512 = String(f.hashes?.sha512 ?? "").toLowerCase();
   const ext = extFromName(f.path ?? "");
 
-  if (!/^[0-9a-f]{64}$/.test(apiSha256)) {
-    throw new PoolResolveError(fileName, "Modrinth 檔案缺少有效 sha256");
+  if (!/^[0-9a-f]{128}$/.test(apiSha512)) {
+    throw new PoolResolveError(fileName, "Modrinth 檔案缺少有效 sha512");
   }
 
-  return dedup(`mr:${apiSha256}`, async () => {
-    const key = poolKey(apiSha256, ext);
-    // headObject 命中 → 連下載都免
-    if (await headObjectExists(key)) {
-      return { sha256: apiSha256, url: publicUrlForKey(key), size: Number(f.fileSize ?? 0) };
-    }
-
+  return dedup(`mr:${apiSha512}`, async () => {
     const downloadUrl = f.downloads?.[0];
     if (!downloadUrl) {
       throw new PoolResolveError(fileName, "Modrinth 檔案缺少下載連結");
     }
 
-    let dl: { sha256: string; size: number; tmpPath: string };
+    let dl: { sha256: string; sha512?: string; size: number; tmpPath: string };
     try {
       dl = await limiter(() =>
-        globalSemaphore.run(() => withRetry(() => downloadAndHashToTemp(downloadUrl, {})))
+        globalSemaphore.run(() =>
+          withRetry(() => downloadAndHashToTemp(downloadUrl, {}, { sha512: true }))
+        )
       );
     } catch (err) {
       throw new PoolResolveError(fileName, `下載失敗：${(err as Error).message}`);
     }
 
     try {
-      if (dl.sha256 !== apiSha256) {
+      if (dl.sha512 !== apiSha512) {
         throw new PoolResolveError(
           fileName,
-          `sha256 不符：API=${apiSha256} 親算=${dl.sha256}`
+          `sha512 不符：API=${apiSha512} 親算=${dl.sha512}`
         );
       }
+      const key = poolKey(dl.sha256, ext);
       if (!(await headObjectExists(key))) {
         await uploadFileToS3(key, dl.tmpPath, "application/octet-stream");
       }
       // 位元組在手（暫存檔）→ 順路解 metadata 落庫（best-effort，須在 finally 清檔前）。
-      await captureModMetadataFromFile(apiSha256, dl.tmpPath, ext);
-      return { sha256: apiSha256, url: publicUrlForKey(key), size: dl.size };
+      await captureModMetadataFromFile(dl.sha256, dl.tmpPath, ext);
+      return { sha256: dl.sha256, url: publicUrlForKey(key), size: dl.size };
     } finally {
       await fs.promises.rm(dl.tmpPath, { force: true });
     }

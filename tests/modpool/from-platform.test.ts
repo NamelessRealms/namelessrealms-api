@@ -200,7 +200,7 @@ describe("POST .../files/from-platform", () => {
     mockVersion({ status: "draft", draft_files: "[]" });
     mrSvc.getVersionFile.mockResolvedValue({
       fileName: "lib.jar",
-      sha256: "b".repeat(64),
+      sha512: "b".repeat(128),
       url: "https://mr/dl",
       size: 200,
     });
@@ -220,7 +220,7 @@ describe("POST .../files/from-platform", () => {
     const fArg = pool.ensureModrinthFileInPool.mock.calls[0][0];
     expect(fArg).toMatchObject({
       path: "lib.jar",
-      hashes: { sha256: "b".repeat(64) },
+      hashes: { sha512: "b".repeat(128) },
       downloads: ["https://mr/dl"],
       fileSize: 200,
     });

@@ -2,7 +2,8 @@
  * @file pool.download.test.ts
  * @description 全域池「真實串流下載 + 算 sha256」路徑測試：以本機 http server 餵已知位元組，
  *   mock S3（headObject/upload）與 Mysql。涵蓋 key 無 serverId、headObject 命中跳過、
- *   Modrinth 命中免下載 / 下載後親算核對（相符上傳、不符報錯）。
+ *   Modrinth 下載後親算 sha256（池 key）+ 以 API sha512 完整性核對（相符上傳、不符/缺 sha512 報錯）。
+ * @notes Modrinth API 只給 sha512/sha1（不含 sha256），故池一律下載後親算 sha256、無 sha256-免下載。
  */
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import crypto from "crypto";
@@ -27,6 +28,7 @@ import {
 } from "../../src/api/utils/modpool/pool";
 
 const sha256 = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex");
+const sha512 = (b: Buffer) => crypto.createHash("sha512").update(b).digest("hex");
 
 let server: TestServer | undefined;
 
@@ -64,40 +66,37 @@ describe("ensureBufferInPool（手動上傳）", () => {
   });
 });
 
-describe("ensureModrinthFileInPool", () => {
-  it("sha256 已知且 headObject 命中 → 連下載都免", async () => {
-    (s3.headObjectExists as any).mockResolvedValue(true);
-    const body = Buffer.from("modrinth mod bytes");
+describe("ensureModrinthFileInPool（sha512 核對，親算 sha256 當池 key）", () => {
+  it("缺有效 sha512 → 報錯（PoolResolveError），不下載", async () => {
+    const body = Buffer.from("no sha512");
     server = await startBytesServer(body);
-
     const f = {
       path: "mods/x.jar",
-      hashes: { sha256: sha256(body) },
+      hashes: { sha1: "abc" }, // 無 sha512
       downloads: [`${server.url}/x.jar`],
       fileSize: body.length,
     };
-    const r = await ensureModrinthFileInPool(f, createImportLimiter());
-
+    await expect(
+      ensureModrinthFileInPool(f, createImportLimiter())
+    ).rejects.toBeInstanceOf(PoolResolveError);
     expect(server.count()).toBe(0);
-    expect(s3.uploadFileToS3).not.toHaveBeenCalled();
-    expect(r.sha256).toBe(sha256(body));
   });
 
-  it("未命中 → 下載並親算，與 API sha256 相符則上傳", async () => {
+  it("下載 → 親算 sha256 當池 key、以 API sha512 核對相符 → 上傳", async () => {
     (s3.headObjectExists as any).mockResolvedValue(false);
     const body = Buffer.from("real streamed bytes");
     server = await startBytesServer(body);
 
     const f = {
       path: "mods/x.jar",
-      hashes: { sha256: sha256(body) },
+      hashes: { sha512: sha512(body) },
       downloads: [`${server.url}/x.jar`],
       fileSize: body.length,
     };
     const r = await ensureModrinthFileInPool(f, createImportLimiter());
 
     expect(server.count()).toBe(1);
-    expect(r.sha256).toBe(sha256(body));
+    expect(r.sha256).toBe(sha256(body)); // 池 key 為親算 sha256
     expect(r.size).toBe(body.length);
     expect(s3.uploadFileToS3).toHaveBeenCalledWith(
       `mods/files/${sha256(body)}.jar`,
@@ -106,14 +105,14 @@ describe("ensureModrinthFileInPool", () => {
     );
   });
 
-  it("下載後親算與 API 值不符 → 報錯（PoolResolveError）", async () => {
+  it("親算 sha512 與 API sha512 不符 → 報錯（PoolResolveError），不上傳", async () => {
     (s3.headObjectExists as any).mockResolvedValue(false);
     const body = Buffer.from("served bytes");
     server = await startBytesServer(body);
 
     const f = {
       path: "mods/x.jar",
-      hashes: { sha256: "a".repeat(64) }, // 與實際內容不符
+      hashes: { sha512: "a".repeat(128) }, // 與實際內容不符
       downloads: [`${server.url}/x.jar`],
       fileSize: body.length,
     };
@@ -121,5 +120,23 @@ describe("ensureModrinthFileInPool", () => {
       ensureModrinthFileInPool(f, createImportLimiter())
     ).rejects.toBeInstanceOf(PoolResolveError);
     expect(s3.uploadFileToS3).not.toHaveBeenCalled();
+  });
+
+  it("池 key（親算 sha256）headObject 命中 → 仍下載算 sha256，但跳過上傳", async () => {
+    (s3.headObjectExists as any).mockResolvedValue(true);
+    const body = Buffer.from("already pooled bytes");
+    server = await startBytesServer(body);
+
+    const f = {
+      path: "mods/x.jar",
+      hashes: { sha512: sha512(body) },
+      downloads: [`${server.url}/x.jar`],
+      fileSize: body.length,
+    };
+    const r = await ensureModrinthFileInPool(f, createImportLimiter());
+
+    expect(server.count()).toBe(1); // 無 sha256-免下載：仍需下載算 sha256
+    expect(s3.uploadFileToS3).not.toHaveBeenCalled(); // headObject 命中 → 免上傳
+    expect(r.sha256).toBe(sha256(body));
   });
 });

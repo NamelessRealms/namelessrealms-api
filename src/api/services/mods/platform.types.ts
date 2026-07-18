@@ -46,8 +46,8 @@ export interface PlatformVersionFile {
   fileName: string;
   /** CF 下載 URL，可能為 null（交由 pool 以 forgecdn 慣例重建） */
   downloadUrl?: string | null;
-  /** Modrinth 檔案 sha256（CF 不使用，走 cf_file_hashes / 親算） */
-  sha256?: string;
+  /** Modrinth 檔案 sha512（Modrinth 不提供 sha256；池下載後親算 sha256、以此 sha512 核對） */
+  sha512?: string;
   /** Modrinth 直接下載連結 */
   url?: string;
   /** 檔案位元組數（Modrinth 有值；CF 進池時由親算取得） */
