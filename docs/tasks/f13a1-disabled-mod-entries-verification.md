@@ -99,19 +99,25 @@ const poolSha256s = Array.from(
 
 ```
 git rev-parse --abbrev-ref HEAD → developers
-git status --short →
-  M src/api/controllers/server-modpack.controller.ts
-  M tests/modpool/f27b1-draft-flow.test.ts
-  ?? tests/modpool/f13a1-disabled.test.ts
-  ?? docs/tasks/f13a1-disabled-mod-entries-verification.md（本報告）
+git log --oneline -1 → 76f6c55 feat: F13a-1 模組停用 entry disabled 旗標（C 案，後端）
+git rev-parse HEAD → 76f6c550f005195e713471b800f0c4d2e815097a
+git rev-parse origin/developers → 76f6c550f005195e713471b800f0c4d2e815097a   （本地 = 遠端）
 ```
-> 尚未 commit / push（依 push 確認流程，先呈 commit 計畫待確認）。commit 後回填：`git log --oneline -1`、`git rev-parse HEAD` = `origin/developers`。
-> 工作區另有 `.gitignore`（harness 追加 `.claude/settings.local.json`）為非本任務改動，不納入本次 commit。
+> 本報告 CI 回填為 HEAD 之後的後續 commit（連同此段對帳一併推送）。
+> 工作區 `.gitignore`（harness 追加 `.claude/settings.local.json`）為非本任務改動，未納入本次 commit。
 
 ## CI
 
 - 本地：`yarn test` green（85）、`yarn build`（`tsc`）green。
-- 遠端：**待推送後回填 Actions run 連結**。依任務驗收條件，remote Actions 綠前任務不算完成；push 後於此補 run 連結與人工確認綠。
+- 遠端：**local green + remote Actions 綠（人工確認）** — commit `76f6c55` CI run 成功（Test + Build 皆綠，24s）：
+  https://github.com/NamelessRealms/namelessrealms-api/actions/runs/29634187709
+  ```
+  ✓ test in 24s
+    ✓ Install dependencies
+    ✓ Test
+    ✓ Build
+  conclusion: success
+  ```
 
 ## 回歸守門
 
