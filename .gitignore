@@ -6,4 +6,5 @@
 .env
 yarn-error.log
 create_api_key.ts
+.claude/settings.local.json
 
