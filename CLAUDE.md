@@ -52,6 +52,63 @@ yarn start
 - **環境設定**：`src/environment/environment.ts` 根據 `NODE_ENV` 動態匯出 dev/prod 設定，不使用 `config.service.ts` 的環境變數直接存取
 - **路由基底類別**：`IRoutes.ts` 提供 `_routers`、`_authJwtVerify` 等共用屬性，所有路由類別皆繼承它
 
+# 程式碼地圖
+
+> 跨 repo 關係見 `../Nymless/docs/ECOSYSTEM.md`(同上層資料夾,路徑含空格需引號)。本 repo 與 Nymless/allay_core 無編譯期耦合,契約靠 HTTP API(F25 將 OpenAPI 化)。
+
+## 分層與目錄結構
+
+請求流:`routes → middlewares → controllers → services → utils/mysql · s3`。業務邏輯放 services,controller 只做參數驗證與組裝回應。
+
+```
+src/
+├─ index.ts / app.ts     進入點與 Express 組裝
+├─ api/
+│  ├─ routes/            路由層,皆繼承 IRoutes(_routers、_authJwtVerify 共用)
+│  ├─ middlewares/       authJwtVerify(啟動器 JWT)、verifyApiKey(Bot)、
+│  │                     requirePermission(伺服器內權限)、rateLimiters、
+│  │                     asyncHandler(必包)、error.middleware
+│  ├─ controllers/       auth / user / server / server-member / server-role /
+│  │                     server-sub-server / server-modpack / mods / platform /
+│  │                     sponsor / violation / whitelist / interactions(未啟用)
+│  ├─ services/          業務邏輯,依領域分子資料夾:
+│  │  ├─ mods/           mods.service、mod-metadata.service、
+│  │  │                  platform-curseforge / platform-modrinth(外部平台介接)
+│  │  ├─ server/         server、member、role、sub-server、sub-server-status
+│  │  └─ auth / user / sponsor / violation / whitelist / mail
+│  └─ utils/             mysql(連線池)、s3、modpool(全域池 + curseforge-url)、
+│                        modJarParser、permissions、response(AppError)、verify
+├─ database/             各資料表 .sql(schema 單一真實來源,新表先落 .sql)
+├─ environment/          dev/prod 動態匯出(經 environment.ts,非 config.service)
+├─ socket/               Socket.IO 事件(Discord 社群互動,部分未啟用)
+└─ interface/            DTO / 介面定義
+
+tests/                    vitest;docs/tasks/ 任務交接件
+根目錄 *.ts 腳本          一次性維運(backfill / audit / recycle / create_api_key)
+```
+
+## 認證雙軌
+
+| 客戶端 | 機制 | 守門 |
+|--------|------|------|
+| Nymless 啟動器 | JWT HS256 | `authJwtVerify` |
+| Discord Bot | `api_keys` 資料表 | `verifyApiKey` |
+
+新路由選錯守門會造成跨客戶端洩漏,任務包未明註時先問。
+
+## S3 儲存策略(不可混用)
+
+- 全域模組池:`mods/files/{sha256}{ext}`——跨伺服器去重,上傳前 `headObject` 預檢。
+- 伺服器編輯檔:`modpacks/{serverId}/files/{sha256}{ext}`——隔離路徑,**不進全域池**。
+
+## 地雷清單
+
+- **雜湊一律 SHA-256(入庫層正規化)**:Modrinth API 只給 sha1/sha512,需下載後親算;CurseForge 雜湊需正規化。
+- **CurseForge `downloadUrl` 可為 null**;forgecdn 下載強制 `x-api-key`(2026-07-16 起)。
+- **asyncHandler 必包**:漏包時非同步錯誤不進 errorMiddleware,直接掃每條新路由。
+- **對外回應錯誤一律 AppError 結構化**,不回框架預設純文字(上游會 5xx)。
+- **密碼 Lazy Migration**:舊 MD5+salt 登入成功後自動升 Argon2,動 auth 流程勿破壞此路徑。
+
 # 編碼行為準則（Karpathy Guidelines）
 
 ## 1. 先思考再動手
