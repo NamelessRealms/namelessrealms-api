@@ -8,3 +8,5 @@ yarn-error.log
 create_api_key.ts
 .claude/settings.local.json
 
+# jscpd 重複率報告（衍生產物；不入版控）
+docs/dedup/

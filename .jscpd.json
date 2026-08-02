@@ -1,0 +1,16 @@
+{
+  "format": ["typescript"],
+  "path": ["src"],
+  "minLines": 5,
+  "minTokens": 50,
+  "threshold": 0,
+  "reporters": ["console", "json", "html"],
+  "output": "docs/dedup",
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/target/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
+}
