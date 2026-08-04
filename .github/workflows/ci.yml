@@ -20,6 +20,17 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      # 防止 package.json 版本號與已 commit 的 src/version.ts 漂移：
+      # 重新產生後若有 diff 即代表有人改了版本號卻沒同步產物。
+      - name: Verify generated version.ts is up to date
+        run: yarn outputVersion && git diff --exit-code src/version.ts
+
+      # 重複率守門（撰碼規約 G）：門檻寫在 .jscpd.json，超過即 exit 1。版本 pin 住，
+      # 否則 jscpd 換算法時同一份程式碼會得到不同百分比、門檻失去意義。
+      # --reporters console 覆蓋設定檔的 json/html，CI 不產報告檔。
+      - name: Duplication check (jscpd)
+        run: npx jscpd@5.0.14 --reporters console
+
       - name: Test
         run: yarn test
 

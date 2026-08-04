@@ -8,7 +8,7 @@
     "dev": "cross-env NODE_ENV=development ts-node-dev --respawn --watch --files -- ./src/index.ts",
     "build": "yarn outputVersion && yarn buildDir && tsc",
     "buildDir": "node build.js",
-    "outputVersion": "node -p \"'export const API_VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
+    "outputVersion": "node scripts/gen-version.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -127,6 +127,13 @@ tests/                    vitest;docs/tasks/ 任務交接件
 
 ## G. 重複率門檻
 - jscpd 基線建立後進 CI，threshold **只准降不准升**。任務若預期提高重複率，須於任務包中說明理由並過 Yu。
+- **本 repo 門檻：`3.7`**（`.jscpd.json`，2026-08-04 ci-dedup-threshold 立案）。
+  來源：實測 3.33% → 向上取到小數第一位 3.4 → 加 0.3 緩衝 → **3.7**（公式 `ceil(實測% × 10) / 10 + 0.3`，三 repo 一致）。
+  緩衝吸收正常開發的小重複，但不留到「債悄悄長回去也不會響」的程度。
+- CI 步驟為 `Duplication check (jscpd)`，指令 `npx jscpd@5.0.14`。⛔ **版本必須 pin**：jscpd 改 token 化或計算方式時，
+  同一份程式碼會得到不同百分比，門檻立刻失去意義。三 repo 用同一版本。
+- ⛔ 不得更動 `.jscpd.json` 的 `minLines` / `minTokens` / `ignore` / `path` / `format`——改了前後數字就不可比，基線與門檻同時失去意義。
+- **操作意義**：**調降門檻不需審查**（重構讓數字降下來就順手鎖住）；**調升一律要理由並過 Yu**。
 
 # 編碼行為準則（Karpathy Guidelines）
 
