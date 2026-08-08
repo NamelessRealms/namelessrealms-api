@@ -215,49 +215,32 @@ refresh 結果：{"status":401,"body":{"success":false,"code":"Unauthorized","er
 
 ## 六、git 對帳
 
-⚠️ **尚未 commit / push**（依任務包 §完成後 4，commit/push 前回報等 Yu 確認）。
+✅ **已 commit / push（2026-08-08，Yu 確認後執行）**。三 repo 皆 `本地 = 遠端`、工作區乾淨。
 
 ```
-=== namelessrealms-api ===
-git log --oneline -1            → 199d1cc ci: jscpd 重複率門檻 3.7 入 CI + version.ts 漂移守門
-git rev-parse HEAD              → 199d1cc3b3b24eedb37a5e45aa14d7ecb28d854c
-git rev-parse @{u}              → 199d1cc3b3b24eedb37a5e45aa14d7ecb28d854c   （本地 = 遠端）
-git status --porcelain          → M  CLAUDE.md
-                                  M  src/api/controllers/auth.controller.ts
-                                  M  src/api/middlewares/rateLimiters.ts
-                                  M  src/api/routes/auth.routes.ts
-                                  M  src/api/services/auth/auth.service.ts
-                                  ?? docs/tasks/f35-logout.md
-                                  ?? docs/tasks/f35-logout-plan.md
-                                  ?? docs/tasks/f35-logout-plan-review.md
-                                  ?? docs/tasks/f35-logout-verification.md
-                                  ?? src/database/revoked_refresh_tokens.sql
-                                  ?? tests/routes/auth.logout.test.ts
+=== namelessrealms-api （branch: developers）===
+git log --oneline -1   → 8849118 feat(f35): POST /auth/logout 撤銷 refresh token + refresh 撤銷檢查（fail-closed）
+git rev-parse HEAD     → 884911814b79bd3925fb298012cac713c744778b
+git rev-parse @{u}     → 884911814b79bd3925fb298012cac713c744778b   （本地 = 遠端 ✅）
+git status --porcelain → （空，clean ✅）
 
-=== allay_core ===
-git log --oneline -1            → 8aec896 feat(f32-1): api::settings 新增 get_language / set_language
-git rev-parse HEAD              → 8aec896e08d4bada580f9d8f2606cf9e085c8513
-git rev-parse @{u}              → 8aec896e08d4bada580f9d8f2606cf9e085c8513   （本地 = 遠端）
-git status --porcelain          → M CLAUDE.md
-                                  M src/store/profiles.rs
+=== allay_core （branch: main）===
+git log --oneline -1   → e8b1fbe feat(f35): Profiles 新增 clear_microsoft_tokens_for（含分塊 token）
+git rev-parse HEAD     → e8b1fbee7c45ba93f4821b759579a7be3bcfe967
+git rev-parse @{u}     → e8b1fbee7c45ba93f4821b759579a7be3bcfe967   （本地 = 遠端 ✅）
+git status --porcelain → （空，clean ✅）
 
-=== Nymless ===
-git log --oneline -1            → bff8c47 feat(f32-3a): en 譯文回掃（597 條）+ 硬編碼中文守門 + locales 三條斷言
-git rev-parse HEAD              → bff8c47e0dbcc06e1c48db91ff7a1f548f3906cb
-git rev-parse @{u}              → bff8c47e0dbcc06e1c48db91ff7a1f548f3906cb   （本地 = 遠端）
-git status --porcelain          → M  CLAUDE.md / docs/ECOSYSTEM.md
-                                  R  docs/tasks/f32-3a-*.md（5 支）→ docs/tasks/archive/
-                                  M  src-tauri/src/{commands.rs, lib.rs, nymless_api/auth.rs, nymless_api/mod.rs}
-                                  M  src/components/common/ConfirmModal.tsx
-                                  M  src/components/layout/MainLayout.tsx
-                                  M  src/i18n/locales/{zh-TW,en}/{common,settings}.json
-                                  M  src/pages/settings/SettingsGeneral.tsx
-                                  M  src/services/auth.ts
-                                  ?? src/components/common/LogoutConfirmModal.tsx
-                                  ?? src/hooks/useLogout.ts
+=== Nymless （branch: main）===
+git log --oneline -1   → e50e987 feat(f35): 登出功能（兩處入口、可選移除 MC 帳號、後端撤銷 best-effort）
+git rev-parse HEAD     → e50e987dfada94372f19a9190060b55f9fbd6158
+git rev-parse @{u}     → e50e987dfada94372f19a9190060b55f9fbd6158   （本地 = 遠端 ✅）
+git status --porcelain → （空，clean ✅）
 ```
 
-push 順序（沿 ECOSYSTEM §五）：**allay_core 綠 → Nymless；api 獨立（分支 `developers`）**。
+push 順序（沿 ECOSYSTEM §五）**已照此執行**：allay_core 先推並**等 CI 綠**後才推 Nymless；api 獨立（`developers`）。
+
+⚠️ 上表為三個 **F35 實作 commit** 推送完成當下的狀態。**本報告的真機結果與 Actions 連結是事後回填**，
+故 api repo 另有一支 `docs:` 後續 commit 只含本檔——實作內容與上表逐字相同，未再變動任何原始碼。
 
 ---
 
@@ -272,8 +255,18 @@ push 順序（沿 ECOSYSTEM §五）：**allay_core 綠 → Nymless；api 獨立
   - `yarn test` / `yarn build` / `cargo test --lib` / `cargo build`（Nymless）→ 全 green
   - `yarn e2e:browser`（Nymless）→ 14 passing
   - `npx jscpd@5.0.14`（三 repo）→ 全數低於門檻且較基線下降
-- 狀態措辭：**local green；remote Actions 尚未執行（未 push）**。
-  ⚠️ 依紀律，**任務要到三個 repo 的 Actions 都綠才算完成**；本報告完成度到「待 push」為止。
+
+### Remote GitHub Actions（三 repo 全綠 ✅）
+
+| Repo | 分支 | Commit | 結論 | Run |
+|---|---|---|---|---|
+| allay_core | `main` | `e8b1fbe` | **success** | https://github.com/NamelessRealms/allay_core/actions/runs/31243869471 |
+| namelessrealms-api | `developers` | `8849118` | **success** | https://github.com/NamelessRealms/namelessrealms-api/actions/runs/31243937211 |
+| Nymless | `main` | `e50e987` | **success** | https://github.com/yucheng918/Nymless/actions/runs/31244006905 |
+
+- 狀態措辭：**local green ＋ remote Actions 三 repo 皆綠**。
+- ⚠️ `push-docker-image.yaml` 只在 `master` 觸發，本次 api push 到 `developers`
+  **未建置映像檔、程式尚未上線**——這正是 §八 所要求的安全狀態。
 
 ---
 
