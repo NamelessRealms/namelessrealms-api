@@ -42,6 +42,7 @@ yarn start
 - `servers` — 伺服器資料（見 `src/database/servers.sql`）
 - `minecraft_accounts` — 玩家 Minecraft 帳號連結（見 `src/database/minecraft_accounts.sql`）
 - `api_keys` — API Key 管理（見 `src/database/api_keys.sql`）
+- `revoked_refresh_tokens` — 已撤銷的 Refresh Token（`token_hash` PK 為 SHA-256, `expires_at`；見 `src/database/revoked_refresh_tokens.sql`）
 
 ## 重要注意事項
 
@@ -108,6 +109,12 @@ tests/                    vitest;docs/tasks/ 任務交接件
 - **asyncHandler 必包**:漏包時非同步錯誤不進 errorMiddleware,直接掃每條新路由。
 - **對外回應錯誤一律 AppError 結構化**,不回框架預設純文字(上游會 5xx)。
 - **密碼 Lazy Migration**:舊 MD5+salt 登入成功後自動升 Argon2,動 auth 流程勿破壞此路徑。
+- **撤銷檢查 fail-closed(F35)**:`refreshAccessToken` 查不到 `revoked_refresh_tokens` 時**一律回 401**,
+  ⛔ 不得 fail-open(那會製造「DB 異常時撤銷失效」的安全洞)。因此**部署順序不可顛倒——必須先建表、再部署程式**;
+  表不存在會讓所有 refresh 一律 401,線上已登入的使用者在 access token 過期後會一起掉線。
+  這是本 repo 唯一一個「操作順序錯了就全站受影響」的變更。
+- **`POST /auth/logout` ⛔ 不掛 `authJwtVerify`**:持有 refresh token 本身即為憑證,
+  且 access token 可能已過期——那正是最需要登出的情境。改掛守門會讓過期使用者登不出去。
 
 # 撰碼規約
 

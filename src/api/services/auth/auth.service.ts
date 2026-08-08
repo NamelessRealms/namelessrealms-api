@@ -7,8 +7,10 @@
  *   - generateAndSaveCode: 產生並發送信箱驗證碼
  *   - registerUser: 驗證碼驗證後建立新用戶帳號
  *   - refreshAccessToken: 以 Refresh Token 換取新的 Access Token
+ *   - revokeRefreshToken: 將 Refresh Token 加入撤銷清單（登出）
  * @dependencies crypto, jsonwebtoken, argon2, mysql, MailService, AppError
  * @notes Lazy Migration：舊 MD5 密碼在首次登入成功後自動升級為 Argon2
+ *        撤銷清單以 token 的 SHA-256 為鍵（per-device），refreshAccessToken 的檢查為 fail-closed
  */
 import * as crypto from "crypto";
 import * as jwt from "jsonwebtoken";
@@ -274,6 +276,8 @@ export default class AuthService {
       throw new AppError("Refresh Token 無效或已過期。", 401, "Unauthorized");
     }
 
+    await this.assertNotRevoked(refreshToken);
+
     const results = await Mysql.getPool().query(
       "SELECT * FROM users WHERE `unique` = ?",
       [decoded.sub],
@@ -308,5 +312,75 @@ export default class AuthService {
       username: user.username,
       role: user.roles as unknown as string[],
     };
+  }
+
+  /**
+   * 將 Refresh Token 加入撤銷清單，使其無法再換發 Access Token（登出）
+   *
+   * 以 token 的 SHA-256 為鍵，故撤銷只影響這一台裝置，不影響同帳號的其他裝置。
+   * 重複撤銷同一 token 不報錯（`ON DUPLICATE KEY UPDATE`），並順手清掉已過期的列。
+   *
+   * @param refreshToken - 要撤銷的 Refresh Token
+   * @throws AppError 若 Refresh Token 無效、已過期或不帶 `exp`
+   */
+  public async revokeRefreshToken(refreshToken: string): Promise<void> {
+    let decoded: any;
+    try {
+      decoded = jwt.verify(refreshToken, config.jwt.refreshSecret);
+    } catch {
+      throw new AppError("Refresh Token 無效或已過期。", 401, "Unauthorized");
+    }
+
+    // 無 exp 的 token 沒有清理上界，寫進去會讓撤銷表無上限成長。簽發端一律帶 expiresIn，故此路徑理論上不會發生。
+    if (typeof decoded.exp !== "number") {
+      throw new AppError("Refresh Token 無效或已過期。", 401, "Unauthorized");
+    }
+
+    const tokenHash = AuthService.hashRefreshToken(refreshToken);
+    const expiresAt = new Date(decoded.exp * 1000);
+
+    await Mysql.getPool().query(
+      "INSERT INTO revoked_refresh_tokens (token_hash, expires_at) VALUES (?, ?) ON DUPLICATE KEY UPDATE expires_at = VALUES(expires_at)",
+      [tokenHash, expiresAt],
+    );
+
+    // 順手清理已過期的列：token 過期後本來就換不了發，留著只是佔空間。⛔ 不另設排程。
+    await Mysql.getPool().query(
+      "DELETE FROM revoked_refresh_tokens WHERE expires_at < NOW()",
+    );
+  }
+
+  /**
+   * 確認 Refresh Token 未被撤銷，命中撤銷清單則拋出 401
+   *
+   * ⚠️ fail-closed：查詢本身失敗（表不存在、DB 異常）一律視為「無法確認未被撤銷」而拒絕，
+   * ⛔ 不得放行——fail-open 會製造「DB 異常時撤銷失效」的安全洞。
+   *
+   * @param refreshToken - 待檢查的 Refresh Token
+   * @throws AppError 401 若命中撤銷清單或查詢失敗
+   */
+  private async assertNotRevoked(refreshToken: string): Promise<void> {
+    let revoked: Array<any>;
+    try {
+      const results = await Mysql.getPool().query(
+        "SELECT token_hash FROM revoked_refresh_tokens WHERE token_hash = ?",
+        [AuthService.hashRefreshToken(refreshToken)],
+      );
+      revoked = results[0] as Array<any>;
+    } catch (error) {
+      logger.error(`Refresh token revocation check failed: ${error}`);
+      throw new AppError("Refresh Token 無效或已過期。", 401, "Unauthorized");
+    }
+
+    // ⛔ 此判斷刻意留在 try 之外：包進去會讓這裡丟的 401 被自己的 catch 吞掉再重丟。
+    if (revoked.length > 0) {
+      // 訊息與 jwt.verify 失敗一致，⛔ 不對外洩漏「這個 token 曾被撤銷」。
+      throw new AppError("Refresh Token 無效或已過期。", 401, "Unauthorized");
+    }
+  }
+
+  /** 撤銷清單的鍵：refresh token 原字串的 SHA-256 十六進位小寫 */
+  private static hashRefreshToken(refreshToken: string): string {
+    return crypto.createHash("sha256").update(refreshToken).digest("hex");
   }
 }

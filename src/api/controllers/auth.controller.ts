@@ -6,6 +6,7 @@
  *   - validateSession: 驗證當前 JWT 是否有效
  *   - sendCode: 向指定信箱發送 6 位數驗證碼
  *   - register: 以驗證碼完成新用戶註冊
+ *   - logout: 撤銷 Refresh Token（登出本裝置）
  * @dependencies AuthService, AppError, environment
  */
 import { Request, Response } from "express";
@@ -134,6 +135,57 @@ export default class AuthController {
   }
 
   public async validateSession(_request: Request, response: Response) {
+    return response.status(200).json({ success: true });
+  }
+
+  /**
+   * @openapi
+   * /auth/logout:
+   *   post:
+   *     tags:
+   *       - Authentication
+   *     summary: 登出並撤銷 Refresh Token
+   *     description: >
+   *       將指定的 Refresh Token 加入撤銷清單，使其無法再換發 Access Token。
+   *       撤銷以 token 雜湊為鍵，只影響持有該 token 的裝置，不影響同帳號的其他裝置。
+   *       ⛔ 本端點不掛 authJwtVerify——持有 Refresh Token 本身即為憑證，
+   *       且 Access Token 可能已過期，那正是需要登出的情境之一。
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - refresh_token
+   *             properties:
+   *               refresh_token:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: 已登出
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *       400:
+   *         description: 遺漏 refresh_token
+   *       401:
+   *         description: Refresh Token 無效或已過期
+   */
+  public async logout(request: Request, response: Response) {
+    const { refresh_token } = request.body;
+
+    if (!refresh_token) {
+      throw new AppError("通訊協定錯誤，遺漏必要的參數。", 400, "InvalidRequest");
+    }
+
+    await this._authService.revokeRefreshToken(refresh_token);
+
     return response.status(200).json({ success: true });
   }
 
