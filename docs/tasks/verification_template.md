@@ -19,25 +19,28 @@
 - {{該寫的 audit/log 有寫、來源記對、不含敏感原值}}
 
 ## 產物重建
-- [ ] 改過原始碼 → 已跑 `./gradlew build`(附輸出)
-- [ ] Docker 環境驗證 → 已 `docker compose build` 確認帶到新 jar(附輸出)
-- [ ] Mixin 改動 → 已附伺服器啟動 log 中該 mixin 套用成功訊息
+- [ ] 改過原始碼 → 已跑 `yarn build`(附輸出)
+- [ ] 動到 schema / migration → 已註明**上線執行順序**(⚠️ 順序反了會讓線上掉線)
 - [ ] 或:無原始碼變更,沿用現有產物
 
 ## git 對帳
 ```
 git log --oneline -1                → {{}}
 git status                          → {{clean?}}
-git rev-parse HEAD origin/main      → {{本地=遠端?(未 push 前據實標「尚未 push」)}}
+git rev-parse HEAD origin/developers → {{本地=遠端?(未 push 前據實標「尚未 push」)}}
 ```
+⚠️ 本 repo 慣例分支是 **`developers`**,⛔ 不是 `main`。
 
 ## CI
-- 本地:`./gradlew build test check --warning-mode fail` → {{green?}}
+- 本地:`yarn build` + `npx vitest run` → {{green?}}
 - 狀態措辭:**local green,remote Actions 待確認**。
   收案標準 = local green + remote Actions 綠(**附 run 連結**,push 批准後補)。
 
-## 真機 E2E(若涉遊戲內行為)
+## 真機 E2E(若涉需人工操作的驗證)
 > 完整步驟表寫在這(供日後複驗);實際執行以協作 Claude 逐步領路為準。
+> ⚠️ **一次一步**(架構師裁決 2026-08-03):素材(fixture)由規劃側**事先備好並交付**,
+> ⛔ 不得只給步驟叫架構師自備;開跑後**一次只給一個步驟**,**等回報結果才給下一步**,
+> ⛔ 不得一次貼整份步驟表。
 | # | 步驟 | 過線標準 | 結果 |
 |---|------|----------|------|
 | 1 | {{}} | {{}} | {{待人工}} |
@@ -46,6 +49,6 @@ git rev-parse HEAD origin/main      → {{本地=遠端?(未 push 前據實標�
 - {{既有功能未壞的證據}}
 
 ## 守界聲明
-- {{確認只做了任務包範圍、未超前、未違反暫行守則}}
+- {{確認只做了任務包範圍、未超前、未違反鐵則}}
 - carryover(若有):{{這階段沒解、留給後續的東西}}
 - ⛔ **尚未 commit/push,等待架構師確認**(或據實記錄已獲確認的時點)。
