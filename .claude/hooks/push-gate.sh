@@ -31,9 +31,21 @@ fi
 
 [ "$tool_name" = "Bash" ] || exit 0
 
-# git [任何全域旗標] push;另涵蓋 gh pr create/merge 這類等效的對外推送
+# git [任何全域旗標] push
 if printf '%s' "$cmd" | grep -qE '(^|[;&|(]|&&|\|\|)[[:space:]]*git([[:space:]]+-[^[:space:]]+([[:space:]]+[^[:space:]]+)?)*[[:space:]]+push([[:space:]]|$)'; then
   deny "⛔ push-gate: 禁止自行 git push。push 是對外不可逆動作,一律回報待 Yu 確認。⚠️ commit 已不再有閘門(2026-08-25 移除 git-gate),但那⛔ 不連帶放行 push——push 仍須逐次取得明示同意。"
+fi
+
+# --- gh:與 push 等效的對外動作 ---
+# ⚠️ 2026-08-30 補。⛔ 在此之前本檔的**註解宣稱涵蓋 gh,實際只比對 git push** ——
+#    離線探針實測 `gh pr create` / `gh pr merge` / `gh release create` **全部放行**。
+#    註解與碼不符,而本檔自述是「唯一擋在對外不可逆動作前的機器防線」⇒ 補上。
+# ⚠️ 刻意**只擋會對外發布或改變遠端狀態**的子指令;
+#    ⛔ 唯讀的 `gh pr view/list/status`、`gh run view`(CI 綠三重確認要用)一律放行。
+# ⛔ **未涵蓋(明列,⛔ 不要假設它擋得住)**:`gh pr comment` / `gh issue comment` / `gh pr review`
+#    —— 對外但可撤回,列為紀律不列為機制;以及任何經 `gh` 以外途徑的對外呼叫(curl 打 API 等)。
+if printf '%s' "$cmd" | grep -qE '(^|[;&|(]|&&|\|\|)[[:space:]]*gh([[:space:]]+-[^[:space:]]+)*[[:space:]]+(pr[[:space:]]+(create|merge|ready|close|reopen)|release[[:space:]]+(create|edit|delete|upload)|repo[[:space:]]+(create|delete|archive)|workflow[[:space:]]+run|api[[:space:]].*-X[[:space:]]*(POST|PUT|PATCH|DELETE))([[:space:]]|$)'; then
+  deny "⛔ push-gate: 禁止自行執行 gh 的對外動作(pr create/merge/ready/close/reopen、release create/edit/delete/upload、repo create/delete/archive、workflow run、api 的寫入方法)。⚠️ 這些與 push 等效:都是**對外不可逆**。一律回報待 Yu 確認。⛔ 唯讀的 gh pr view/list、gh run view 不受限。"
 fi
 
 exit 0
