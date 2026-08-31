@@ -10,3 +10,6 @@ create_api_key.ts
 
 # jscpd 重複率報告（衍生產物；不入版控）
 docs/dedup/
+
+# 任務取證落檔（一次性輸出，非專案產物；含測試帳號 token，⛔ 不入版控歷史）
+.evidence/

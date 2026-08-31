@@ -30,9 +30,47 @@ import { AppError } from "../../utils/response/AppError";
 export default class AuthService {
   private _mailService = new MailService();
   /**
+   * 將 DB 的 `users.roles` 值正規化為字串陣列
+   *
+   * `users.roles` 宣告為 JSON（mysql2 會自動 parse 成陣列），但歷史遷移可能留下 varchar 存的
+   * JSON 字串或裸字串，舊列也可能為 NULL。三態一律收斂成字串陣列，避免 JWT payload 的 `role`
+   * 型別在不同簽發路徑之間漂移。
+   *
+   * @param dbValue - `users.roles` 的原始值（陣列 / JSON 字串 / 裸字串 / NULL）
+   * @returns 角色字串陣列；無法解讀或無角色時回 `[]`（⛔ 不回 `[""]` 這種假角色）
+   */
+  private static normalizeRoles(dbValue: unknown): string[] {
+    if (Array.isArray(dbValue)) {
+      return dbValue as string[];
+    }
+
+    if (typeof dbValue === "string") {
+      const trimmed = dbValue.trim();
+      if (trimmed === "") {
+        return [];
+      }
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? (parsed as string[]) : [trimmed];
+      } catch {
+        // 非 JSON 的裸字串（例：'user'）視為單一角色
+        return [trimmed];
+      }
+    }
+
+    // NULL / undefined / 其他型別：寧可無角色也不要偽角色
+    return [];
+  }
+
+  /**
    * OAuth2 密碼授權驗證，支援 MD5 → Argon2 Lazy Migration，成功後回傳 Access / Refresh Token
    *
-   * @param verifyData - 包含 grant_type、username、password 的授權資料
+   * 身分查找為兩段式：先以 Email 精確比對，查無再比使用者名稱。
+   *
+   * @param verifyData - 包含 grant_type、username、password 的授權資料。
+   *                     ⚠️ `username` 欄位名沿用 OAuth2 password grant 的既定名稱，
+   *                     但語意為「Email 或使用者名稱」（Email 優先）
    * @returns Access Token、Refresh Token、使用者名稱與角色列表
    * @throws AppError 若授權類型不符、帳號不存在或密碼錯誤
    */
@@ -48,12 +86,26 @@ export default class AuthService {
       );
     }
 
-    // 1. 先根據使用者名稱搜尋使用者 (不再直接在 SQL 比對密碼，為了實作 Lazy Migration)
-    const results = await Mysql.getPool().query(
-      "SELECT * FROM users WHERE username = ?",
+    // 1. 兩段式身分查找：Email 精確比對優先，查無再比使用者名稱
+    //    (不在 SQL 比對密碼，為了實作 Lazy Migration)
+    //    ⛔ 不得改回 `WHERE email = ? OR username = ?` 單查：username 與 email 各自 UNIQUE 但跨欄位不互斥，
+    //       單查的結果會依列序而非語意決定身分。
+    const emailResults = await Mysql.getPool().query(
+      "SELECT * FROM users WHERE email = ?",
       [verifyData.username],
     );
-    const users = results[0] as Array<IUser>;
+    let users = emailResults[0] as Array<IUser>;
+
+    // ⛔ Email 段命中即定案，不 fall through 到 username 段（即使密碼不符）：
+    //    fall through 會讓最終身分由「哪個帳號的密碼恰好對得上」決定（正是上面要避免的巧合決定身分），
+    //    且單次請求的密碼比對次數加倍，使 loginLimiter 的實際保護強度減半。
+    if (users.length === 0) {
+      const usernameResults = await Mysql.getPool().query(
+        "SELECT * FROM users WHERE username = ?",
+        [verifyData.username],
+      );
+      users = usernameResults[0] as Array<IUser>;
+    }
 
     if (users.length === 0) {
       throw new AppError(
@@ -114,11 +166,12 @@ export default class AuthService {
     }
 
     // 4. 產生 OAuth 2.0 和 JWT 的 JSON 格式令牌訊息
+    const role = AuthService.normalizeRoles(user.roles);
     const payload = {
       sub: user.unique,
       username: user.username,
       iss: "NR System API",
-      role: user.roles
+      role
     };
 
     const token = jwt.sign(payload, config.jwt.secret, {
@@ -135,7 +188,7 @@ export default class AuthService {
       tokenCode: token,
       refreshToken,
       username: user.username,
-      role: user.roles as unknown as string[],
+      role,
     };
   }
 
@@ -169,13 +222,18 @@ export default class AuthService {
   }
 
   /**
-   * 註冊新使用者
+   * 註冊新使用者，成功後回傳與登入路徑同形狀的 Token 與身分資訊
+   *
    * @param data 註冊資訊
    * @param code 驗證碼
+   * @returns Access Token、Refresh Token、使用者名稱與角色列表（與 `verify()` 對稱）
+   * @throws AppError 若驗證碼不正確／已過期，或使用者名稱／Email 已被註冊
    */
   public async registerUser(data: RegisterDTO, code: string): Promise<{
     accessToken: string,
-    refreshToken: string
+    refreshToken: string,
+    username: string,
+    role: string[]
   }> {
     // 0. 驗證驗證碼
     const codeResults = await Mysql.getPool().query(
@@ -212,7 +270,10 @@ export default class AuthService {
     const hashedPassword = await this.hashPassword(data.password);
 
     const id = uniqid();
-    const roles = JSON.stringify(["user"]); // 預設權限
+    // 預設權限。⚠️ DB 欄位維持寫入 JSON 字串（⛔ 不改既有資料形狀）；
+    //    JWT payload 與回應一律用字串陣列，與 verify() / refreshAccessToken() 同型別。
+    const role = ["user"];
+    const roles = JSON.stringify(role);
 
     // 3. 寫入資料庫
     const newUser = {
@@ -229,13 +290,13 @@ export default class AuthService {
       sub: id,
       username: data.username,
       iss: "NR System API",
-      role: roles
+      role
     };
 
-    // Access Token: 短效 (15分鐘)
+    // Access Token: 短效。效期與 verify() / refreshAccessToken() 同源，⛔ 不硬寫字面值
     const accessToken = jwt.sign(payload, config.jwt.secret, {
       algorithm: "HS256",
-      expiresIn: "15m",
+      expiresIn: `${environment.jwt.increaseTime}ms`,
     });
 
     // Refresh Token: 長效 (7天)
@@ -252,7 +313,9 @@ export default class AuthService {
 
     return {
       accessToken,
-      refreshToken
+      refreshToken,
+      username: data.username,
+      role
     }
   }
 
@@ -289,11 +352,12 @@ export default class AuthService {
     }
 
     const user = users[0];
+    const role = AuthService.normalizeRoles(user.roles);
     const payload = {
       sub: user.unique,
       username: user.username,
       iss: "NR System API",
-      role: user.roles,
+      role,
     };
 
     const newAccessToken = jwt.sign(payload, config.jwt.secret, {
@@ -310,7 +374,7 @@ export default class AuthService {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
       username: user.username,
-      role: user.roles as unknown as string[],
+      role,
     };
   }
 

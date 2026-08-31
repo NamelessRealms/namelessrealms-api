@@ -109,6 +109,8 @@ export default class AuthController {
       return response.status(200).json({
         access_token: refreshData.accessToken,
         token_type: "bearer",
+        // ⚠️ 絕對 epoch 毫秒，⛔ 不是 OAuth2 的「剩餘秒數」。與 Nymless `is_token_expired()` 的解讀對齊，
+        //    ⛔ 不得單邊改成秒數（改了會讓客戶端把小整數當 1970 年時間戳，或把時間戳當秒數而永不過期）。
         expires_in: new Date().getTime() + environment.jwt.increaseTime,
         scope: refreshData.role,
         refresh_token: refreshData.refreshToken,
@@ -124,6 +126,7 @@ export default class AuthController {
       return response.status(200).json({
         access_token: verifyData.tokenCode,
         token_type: "bearer",
+        // ⚠️ 絕對 epoch 毫秒，⛔ 不是 OAuth2 的「剩餘秒數」（語意說明同上）
         expires_in: new Date().getTime() + environment.jwt.increaseTime,
         scope: verifyData.role,
         refresh_token: verifyData.refreshToken,
@@ -347,12 +350,18 @@ export default class AuthController {
       // 2. 呼叫 Service 執行註冊
       const verifyData = await this._authService.registerUser({ username, email, password }, code);
 
-      // 3. 回傳成功
+      // 3. 回傳成功（欄位與 login() 對稱，讓客戶端能沿用同一條 session 持久化路徑；
+      //    既有的 success / message 保留，舊客戶端不受影響）
       return response.status(201).json({
         success: true,
         message: "註冊成功！",
         access_token: verifyData.accessToken,
+        token_type: "bearer",
+        // ⚠️ 絕對 epoch 毫秒，⛔ 不是 OAuth2 的「剩餘秒數」（語意說明同 login()）
+        expires_in: new Date().getTime() + environment.jwt.increaseTime,
+        scope: verifyData.role,
         refresh_token: verifyData.refreshToken,
+        info: { username: verifyData.username },
       });
 
     } catch (error: any) {

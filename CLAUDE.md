@@ -115,6 +115,11 @@ tests/                    vitest;docs/tasks/ 任務交接件
   這是本 repo 唯一一個「操作順序錯了就全站受影響」的變更。
 - **`POST /auth/logout` ⛔ 不掛 `authJwtVerify`**:持有 refresh token 本身即為憑證,
   且 access token 可能已過期——那正是最需要登出的情境。改掛守門會讓過期使用者登不出去。
+- **登入識別採 Email 優先的兩段式查找(fix-login-contract)**:`verify()` 先 `WHERE email = ?`,
+  查無再 `WHERE username = ?`。⛔ 不得改回 `WHERE email = ? OR username = ?` 單查——
+  `username` 與 `email` 各自 UNIQUE 但**跨欄位不互斥**,單查的身分會依列序而非語意決定。
+  ⛔ Email 段命中即定案,**不 fall through** 到 username 段(即使密碼不符):
+  fall through 會讓最終身分由「哪個帳號的密碼恰好對得上」決定,並使單次請求的密碼比對次數加倍。
 
 # 撰碼規約
 
