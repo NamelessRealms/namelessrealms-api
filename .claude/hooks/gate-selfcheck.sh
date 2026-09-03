@@ -56,13 +56,22 @@ check_gate "review-write-guard.sh" '{"tool_name":"Write","agent_type":"nr-implem
 #    整條驗證鏈寫不出東西。⛔ 只驗 deny 的自檢會漏掉這種「擋過頭」的壞法。
 RWG="$DIR/review-write-guard.sh"
 if [ -x "$RWG" ]; then
-  wl_payload() { printf '{"tool_name":"Write","agent_type":"%s","tool_input":{"file_path":"docs/tasks/M0-0-plan-rev%s.md"}}' "$1" "iew"; }
-  for a in nr-planner nr-auditor; do
-    out=$(wl_payload "$a" | "$RWG" 2>/dev/null)
-    printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
-      && add "⛔ review-write-guard **擋住了白名單代理 $a** —— 那兩個檔是它的正當產出,擋掉等於整條驗證鏈寫不出東西。⛔ 不是放寬閘門,是白名單壞了。"
-  done
-  out=$(wl_payload "nr-implementer" | "$RWG" 2>/dev/null)
+  # ⚠️ 2026-09-02 改判(架構師裁決,交接包第 6 題):白名單是**代理↔檔案一對一綁定**,四格一組:
+  #    自己那份要寫得到(兩格)/ 對方那份要擋住(兩格)。⛔ 只留前兩格會漏掉「planner 寫 audit」這種越界。
+  wl_payload() { printf '{"tool_name":"Write","agent_type":"%s","tool_input":{"file_path":"docs/tasks/M0-0-%s.md"}}' "$1" "$2"; }
+  out=$(wl_payload nr-planner "plan-rev""iew" | "$RWG" 2>/dev/null)
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+    && add "⛔ review-write-guard **擋住了 nr-planner 寫 plan-review** —— 那是它的正當產出,擋掉等於整條驗證鏈寫不出東西。⛔ 不是放寬閘門,是白名單壞了。"
+  out=$(wl_payload nr-auditor "verification-au""dit" | "$RWG" 2>/dev/null)
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+    && add "⛔ review-write-guard **擋住了 nr-auditor 寫 verification-audit** —— 那是它的正當產出。⛔ 不是放寬閘門,是白名單壞了。"
+  out=$(wl_payload nr-planner "verification-au""dit" | "$RWG" 2>/dev/null)
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+    || add "⛔ review-write-guard **放行了 nr-planner 寫 verification-audit** —— 一對一綁定失效(2026-09-02 改判):規劃側寫稽核報告等於自己審自己。"
+  out=$(wl_payload nr-auditor "plan-rev""iew" | "$RWG" 2>/dev/null)
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+    || add "⛔ review-write-guard **放行了 nr-auditor 寫 plan-review** —— 一對一綁定失效(2026-09-02 改判)。"
+  out=$(wl_payload "nr-implementer" "plan-rev""iew" | "$RWG" 2>/dev/null)
   printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
     || add "⛔ review-write-guard **放行了 nr-implementer** —— 實作側寫得到 review/audit,寫入權鐵律已失效。"
 
@@ -119,6 +128,23 @@ if [ -x "$VG" ]; then
     printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
       || add "⛔ vault-guard **放行了子代理 $a** —— 子代理一旦能自己去 vault 補洞,「任務包漏寫規格就會有人卡住回報」這個訊號就消失了。"
   done
+
+  # --- 2026-09-02 改版(路徑正規化 + Glob/Grep 祖先判準 + Bash 啟發式)四格:兩擋兩放 ---
+  # ⚠️ 改版前的字面比對,自捏 payload 8 種寫法有 6 種放行(交接包發現 4)。⛔ 只留擋的兩格會漏掉「擋過頭」:
+  #    子代理連自己的 repo 都搜不了、或把 Grep 的正規表示式當路徑擋,都是閘門逼出繞道的形狀。
+  vgj() { jq -nc --arg t "$1" --arg a "$2" --argjson i "$3" '{tool_name:$t,agent_type:$a,cwd:"/Users/quasi-pc/Desktop/Projects/x",tool_input:$i}'; }
+  out=$(vgj Glob nr-planner '{"path":"/Users/quasi-pc/Documents","pattern":"Obs*/**/*.md"}' | "$VG" 2>/dev/null)
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+    || add "⛔ vault-guard **放行了以 vault 祖先目錄為根的 Glob** —— 祖先為根 + pattern 就搜得進 vault;2026-09-02 改版前就是這樣被繞過的。"
+  out=$(vgj Bash nr-implementer '{"command":"D=$HOME/Documents/Ob; cat \"${D}sidian Va\"ult/x.md"}' | "$VG" 2>/dev/null)
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+    || add "⛔ vault-guard **放行了 Bash 的 \$HOME/Documents 寫法** —— 啟發式層失效(2026-09-02 改版)。"
+  out=$(vgj Glob nr-planner '{"path":"/Users/quasi-pc/Desktop/Projects/x","pattern":"**/*.md"}' | "$VG" 2>/dev/null)
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+    && add "⛔ vault-guard **擋住了子代理在專案內的 Glob** —— 擋過頭:子代理連自己的 repo 都搜不了,它會繞道。"
+  out=$(vgj Grep nr-planner '{"pattern":"a..b","path":"."}' | "$VG" 2>/dev/null)
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+    && add "⛔ vault-guard **把 Grep 的正規表示式當路徑擋了** —— Grep 的 pattern 是 regex(含 .. 很正常),只有 glob 欄才是路徑樣式。"
 fi
 
 # --- 1d. audit-write-guard 的**誤殺 / 剝除**三格(2026-08-30 加)---

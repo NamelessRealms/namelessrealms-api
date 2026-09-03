@@ -72,11 +72,16 @@ fi
 #    ⇒ 主迴圈要偽造在派工訊息裡偽造即可,本閘門攔不住;它增加的完整性接近零,
 #    成本卻是每個裁決一次完整的代理往返(M1-8 實測 9 次以上)。
 #    ⇒ 本閘門的對象收斂為「非裁決方的**實作側**」,那才是 2026-08-19 事故的真正形狀。
-ALLOWED_AGENTS="nr-planner nr-auditor"
+# ⚠️ **2026-09-02 改判(架構師裁決,nr-planner 交接包第 6 題)**:白名單改為**代理↔檔案一對一綁定**。
+#    原版一命中代理名就 exit 0、⛔ 不看檔名 ⇒ nr-planner 也寫得到 verification-audit、
+#    nr-auditor 也寫得到 plan-review(後者另有 audit-write-guard 擋著,前者**沒有任何鎖**)。
+#    現在:白名單代理只放行**自己那一份**;要寫另一份,TARGETS 收窄成「它不該寫的那個檔」後照下方比對擋。
 agent_type=$(printf '%s' "$input" | jq -r '.agent_type // ""' 2>/dev/null)
-for a in $ALLOWED_AGENTS; do
-  [ "$agent_type" = "$a" ] && exit 0
-done
+TARGETS='\-(plan-review|verification-audit)\.md'
+case "$agent_type" in
+  nr-planner) TARGETS='\-verification-audit\.md' ;;
+  nr-auditor) TARGETS='\-plan-review\.md' ;;
+esac
 
 # --- 主迴圈放行(架構師 2026-08-29 裁決)---
 # ⚠️⚠️ 判別只能看「值為空」,⛔ 不可加 jq has("agent_type") 這一層:
@@ -89,8 +94,7 @@ if [ -z "$agent_type" ]; then
   exit 0
 fi
 
-TARGETS='\-(plan-review|verification-audit)\.md'
-PREFIX="⛔ review-write-guard: {代號}-plan-review.md 與 {代號}-verification-audit.md 只有 nr-planner / nr-auditor 寫得到,而你是 [${agent_type}]。"
+PREFIX="⛔ review-write-guard: {代號}-plan-review.md 只有 nr-planner 寫得到、{代號}-verification-audit.md 只有 nr-auditor 寫得到(2026-09-02 起一對一綁定),而你是 [${agent_type}]。"
 TAIL="⚠️ 批覆記錄由非裁決方寫入即屬偽造,內容碰巧正確也一樣——檔案管道的全部價值來自「誰寫的」。有要回報的事(裁示請求、審核意見、發現前提錯誤),一律寫進**自己產出的檔**(plan / verification)或另立回報檔,然後停下來等對方處理。⛔ 看到 review/audit 不存在時,正確動作是等待,不是補上。讀取不受限制。"
 
 # --- 1. 寫入型工具:比對 file_path / notebook_path ---

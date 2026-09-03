@@ -58,9 +58,90 @@ fi
 [ -z "$agent_type" ] && exit 0
 
 # --- 子代理:一律擋 ---
-# 大小寫不敏感;涵蓋 raw、URL-encoded、以及 ~ 展開前的寫法
+# ⚠️ **2026-09-02 改版**(架構師裁決:nr-planner 交接包第 3 題甲之 1 + 第 5 題):
+#    原版只做**字面**比對,自捏 payload 實測 8 種寫法有 6 種放行
+#    (相對路徑、Glob/Grep 以祖先目錄為根 + pattern 展開、Bash 萬用字元 / 拆字 / ~ / $HOME)。
+#    現在分三層,任一層命中即擋:
+#    ① 字面比對(原有,保留 —— 抓 URL-encoded 與 ~ 展開前的寫法);
+#    ② **路徑正規化**:file_path / path 相對於 payload 的 cwd 補成絕對路徑、展開 ~、消掉 . 與 ..,
+#       再看是否落在 vault 之下;Glob / Grep 另擋「以 vault 的**祖先**為根」(祖先為根 + pattern 就搜得進去)、
+#       pattern / glob 含 `..`、以及 path 本身帶萬用字元(搜尋根不該有萬用字元);
+#    ③ Bash 只能做啟發式:提到 ~/Documents、$HOME/Documents、/Users/quasi-pc/Documents、
+#       `Obs?dian` 這類拆字、`Obs*` 這類萬用字元,一律擋。子代理在 Desktop/Projects 底下工作,⛔ 沒有正當理由碰 Documents。
+#    ⚠️ 誠實邊界(⛔ 不要對它有超出的期待):Bash 用**變數拼接**把「Documents」本身拆開
+#    (D=$HOME/Doc"u"ments)擋不住;repo 內若有指向 vault 的 symlink 也擋不住。前者是 shell 的本質,
+#    後者靠「repo 內不放 symlink」的紀律。②③ 都是**字串**層面,⛔ 不呼叫 realpath(目標可能不存在、macOS 版本行為不一)。
+#    ⚠️ 2026-09-02 工具層實測:Read **不展開** `?`(給 `Obs?dian` 回 File does not exist),但**會解析** `..`;
+#       Glob / Grep 的展開行為在總管的 harness 裡**沒有那兩個工具**,⛔ 未實跑 —— 故 ② 對它們採「祖先即擋」的保守判準。
+
+VAULT="/Users/quasi-pc/Documents/Obsidian Vault"
+cwd=$(printf '%s' "$input" | jq -r '.cwd // ""' 2>/dev/null)
+
+# 純文字正規化:補 cwd、展開 ~、消 . 與 ..;⛔ 不碰檔案系統
+norm() {
+  local p="$1" out="" seg
+  case "$p" in
+    "~") p="$HOME" ;;
+    "~/"*) p="${HOME}${p#\~}" ;;
+    /*) ;;
+    *) p="${cwd:-/}/$p" ;;
+  esac
+  local IFS='/'
+  for seg in $p; do
+    case "$seg" in
+      ""|".") ;;
+      "..") out="${out%/*}" ;;
+      *) out="$out/$seg" ;;
+    esac
+  done
+  printf '%s' "${out:-/}"
+}
+
+under_vault() { case "$1" in "$VAULT"|"$VAULT"/*) return 0 ;; esac; return 1; }
+ancestor_of_vault() { [ "$1" = "/" ] && return 0; case "$VAULT" in "$1"|"$1"/*) return 0 ;; esac; return 1; }
+
+TAILMSG="⚠️ 任務包/派工訊息是你的唯一來源:裡面沒寫的規格就是**缺失**,請停手回報卡住,⛔ 不要去別處找。需要 vault 裡的東西 ⇒ 回報並停下;主迴圈⛔ 不得抄給你,須先落 repo(架構師 2026-09-02 裁決乙)。"
+deny_path() {
+  deny "⛔ vault-guard: 子代理(${agent_type})不得存取 Obsidian Vault —— vault 讀寫權**專屬主迴圈**。工具 ${tool_name} 的 $1 = [$2],$3。${TAILMSG}"
+}
+
+# ① 字面比對(原有):大小寫不敏感;涵蓋 raw、URL-encoded、以及 ~ 展開前的寫法
 if printf '%s' "$payload" | grep -qiE 'Obsidian[ _]?(Vault|%20Vault)|/Users/quasi-pc/Documents/Obsidian'; then
-  deny "⛔ vault-guard: 子代理(${agent_type})不得存取 Obsidian Vault(/Users/quasi-pc/Documents/Obsidian Vault/)——vault 讀寫權**專屬主迴圈**。工具 ${tool_name} 的參數命中 vault 路徑,已阻擋。⚠️ 任務包/派工訊息是你的唯一來源:裡面沒寫的規格就是**缺失**,請停手回報卡住,⛔ 不要去別處找。需要 vault 裡的東西 ⇒ 回報,由主迴圈判斷該不該抄給你。"
+  deny "⛔ vault-guard: 子代理(${agent_type})不得存取 Obsidian Vault(/Users/quasi-pc/Documents/Obsidian Vault/)——vault 讀寫權**專屬主迴圈**。工具 ${tool_name} 的參數命中 vault 路徑,已阻擋。${TAILMSG}"
 fi
+
+# ② 路徑正規化
+case "$tool_name" in
+  Read|Write|Edit|MultiEdit|NotebookEdit)
+    fp=$(printf '%s' "$input" | jq -r '.tool_input.file_path // .tool_input.notebook_path // ""' 2>/dev/null)
+    if [ -n "$fp" ]; then
+      n=$(norm "$fp")
+      under_vault "$n" && deny_path "file_path" "$n" "正規化後落在 vault 之下"
+      printf '%s' "$fp" | grep -q '[*?[]' && deny_path "file_path" "$fp" "帶萬用字元(檔案路徑不該有萬用字元)"
+    fi
+    ;;
+  Glob|Grep)
+    p=$(printf '%s' "$input" | jq -r '.tool_input.path // ""' 2>/dev/null)
+    printf '%s' "$p" | grep -q '[*?[]' && deny_path "path" "$p" "搜尋根帶萬用字元(搜尋根不該有萬用字元)"
+    n=$(norm "${p:-.}")
+    under_vault "$n" && deny_path "path" "$n" "正規化後落在 vault 之下"
+    ancestor_of_vault "$n" && deny_path "path" "$n" "是 vault 的祖先目錄(以祖先為根 + pattern 就搜得進 vault)"
+    # Glob 的 pattern 是檔案樣式;Grep 的 pattern 是**正規表示式**(含 .. 很正常)⇒ Grep 只看 glob 欄
+    if [ "$tool_name" = "Glob" ]; then
+      pg=$(printf '%s' "$input" | jq -r '.tool_input.pattern // ""' 2>/dev/null)
+    else
+      pg=$(printf '%s' "$input" | jq -r '.tool_input.glob // ""' 2>/dev/null)
+    fi
+    if printf '%s' "$pg" | grep -qE '(^|/)\.\.(/|$)|^/|^~'; then
+      deny_path "pattern/glob" "$pg" "含 ..、絕對路徑或 ~(可從搜尋根往上爬)"
+    fi
+    ;;
+  Bash)
+    cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""' 2>/dev/null)
+    if printf '%s' "$cmd" | grep -qiE 'obs.{0,3}dian|(^|[^a-z])obs[*?[]|(/users/quasi-pc|\$home|\$\{home\}|~)/documents'; then
+      deny_path "command" "(啟發式命中)" "疑似以萬用字元、拆字、~ 或 \$HOME 寫法指向 vault"
+    fi
+    ;;
+esac
 
 exit 0
