@@ -11,6 +11,7 @@
 -- ── 獨立表（無外鍵）────────────────────────────────────────
 SOURCE users.sql;
 SOURCE verification_codes.sql;
+SOURCE revoked_refresh_tokens.sql; -- F35 撤銷檢查為 fail-closed，缺表則所有 refresh 一律 401
 SOURCE api_keys.sql;
 SOURCE minecraft_accounts.sql;
 SOURCE dashboard_user_roles.sql;
