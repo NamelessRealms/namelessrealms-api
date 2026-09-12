@@ -15,7 +15,7 @@ hooks:
 
 鐵則:
 1. 任務包是唯一來源。包裡沒寫的規格就是缺失——**回報卡住,不自行推測、不去別處找**。
-2. ⛔ 不得存取 Obsidian Vault 任何路徑(由 vault-guard hook 強制)。
+2. ⛔ 不得存取 vault(NamelessRealmsVault)任何路徑(由 vault-guard hook 強制)。
 3. ⛔ commit / push 一律回報待 Yu 確認,不自行執行。
 4. verification 只寫**實跑過的事實**;未實跑者明寫「未驗」,不得以源碼推理代替。
 5. ⛔ 不得寫或改 `{代號}-plan-review.md` / `{代號}-verification-audit.md`,

@@ -10,11 +10,8 @@ command -v jq >/dev/null 2>&1 || exit 0
 
 ROOT="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 NAME="$(basename "$ROOT")"
-# ⚠️ 改名過渡期(Yu 2026-09-12 兩次裁決):vault 根 `Obsidian Vault` → `NamelessRealmsVault`;知識庫目錄 `Claude 知識庫` → `vaults`。
-#    哪個存在就用哪個;兩次改名都收尾後只留第一行。
+# ℹ️ 2026-09-12 兩次改名已收尾:只認 NamelessRealmsVault/vaults(過渡期的回退行已移除,2026-09-12c)。
 KB="/Users/quasi-pc/Documents/NamelessRealmsVault/vaults"
-[ -d "$KB" ] || KB="/Users/quasi-pc/Documents/NamelessRealmsVault/Claude 知識庫"
-[ -d "$KB" ] || KB="/Users/quasi-pc/Documents/Obsidian Vault/Claude 知識庫"
 
 # vault 對應:⚠️ Nymless 群是**一庫管三 repo**,三個 repo 共用同一份 vault 與同一個 F 編號 backlog
 case "$NAME" in

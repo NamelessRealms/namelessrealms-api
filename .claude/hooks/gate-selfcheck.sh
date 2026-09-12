@@ -45,8 +45,6 @@ check_gate() {
 }
 
 check_gate "vault-guard.sh"       '{"tool_name":"Read","agent_type":"nr-implementer","tool_input":{"file_path":"/Users/quasi-pc/Documents/NamelessRealmsVault/probe.md"}}'
-# ⚠️ 2026-09-12 改名過渡期:舊根目錄 `Obsidian Vault` 也必須仍被擋(改名前後任一時點都不得有空窗);改名收尾、模板移除舊根後本行一併刪。
-check_gate "vault-guard.sh"       '{"tool_name":"Read","agent_type":"nr-implementer","tool_input":{"file_path":"/Users/quasi-pc/Documents/Obsidian Vault/probe.md"}}'
 check_gate "push-gate.sh"         '{"tool_name":"Bash","tool_input":{"command":"git pu'"sh"' origin main"}}'
 check_gate "audit-write-guard.sh" '{"tool_name":"Bash","tool_input":{"command":"echo x > CLAUDE.md"}}'
 # ⚠️ 這個必中樣本**必須帶 agent_type** —— 2026-08-29 判準改為「沒有 agent_type ⇒ 主迴圈 ⇒ 放行」之後,

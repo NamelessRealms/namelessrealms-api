@@ -2,7 +2,7 @@
 # vault-guard.sh — PreToolUse hook
 #   掛載點:①.claude/settings.json(涵蓋主迴圈**與所有子代理**)②nr-implementer 的 frontmatter(冗餘防線)
 #
-# 擋什麼:**任何子代理**對 Obsidian Vault 路徑的存取(讀與寫皆擋)。
+# 擋什麼:**任何子代理**對 vault(NamelessRealmsVault)路徑的存取(讀與寫皆擋)。
 # 放行:**主迴圈**(agent_type 為空)——它是唯一有 vault 讀寫權的角色。
 #
 # ⚠️ 權責是這樣定的(架構師 2026-08-24 拍板,取代原「Claude Code 連讀都不碰」):
@@ -74,12 +74,9 @@ fi
 #    ⚠️ 2026-09-02 工具層實測:Read **不展開** `?`(給 `Obs?dian` 回 File does not exist),但**會解析** `..`;
 #       Glob / Grep 的展開行為在總管的 harness 裡**沒有那兩個工具**,⛔ 未實跑 —— 故 ② 對它們採「祖先即擋」的保守判準。
 
-# ⚠️ 2026-09-12 起 vault 根目錄**改名過渡期**(Yu 裁:`Obsidian Vault` → `NamelessRealmsVault`,去掉路徑空格以供 CLAUDE.md `@` 引用):
-#    兩個根目錄**同時擋**,⛔ 不看哪個真的存在(本閘門是純字串比對,不碰檔案系統)。
-#    順序鐵律:先把本檔換到七家 repo,**再**改名 —— 反過來做,改名到換檔之間子代理讀 vault 會全放行。
-#    改名完成、七家自檢全綠後,再由模板包移除舊根目錄並升版。
+# ℹ️ 2026-09-12 vault 根目錄改名為 `NamelessRealmsVault`(去掉路徑空格以供 CLAUDE.md `@` 引用)。
+#    過渡期(2026-09-12 / 12b 版)曾新舊兩根同擋;改名收尾版(2026-09-12c)起只認新根 —— 舊根已不存在。
 VAULT="/Users/quasi-pc/Documents/NamelessRealmsVault"
-VAULT_OLD="/Users/quasi-pc/Documents/Obsidian Vault"
 cwd=$(printf '%s' "$input" | jq -r '.cwd // ""' 2>/dev/null)
 
 # 純文字正規化:補 cwd、展開 ~、消 . 與 ..;⛔ 不碰檔案系統
@@ -102,22 +99,21 @@ norm() {
   printf '%s' "${out:-/}"
 }
 
-under_vault() { case "$1" in "$VAULT"|"$VAULT"/*|"$VAULT_OLD"|"$VAULT_OLD"/*) return 0 ;; esac; return 1; }
+under_vault() { case "$1" in "$VAULT"|"$VAULT"/*) return 0 ;; esac; return 1; }
 ancestor_of_vault() {
   [ "$1" = "/" ] && return 0
   case "$VAULT" in "$1"|"$1"/*) return 0 ;; esac
-  case "$VAULT_OLD" in "$1"|"$1"/*) return 0 ;; esac
   return 1
 }
 
 TAILMSG="⚠️ 任務包/派工訊息是你的唯一來源:裡面沒寫的規格就是**缺失**,請停手回報卡住,⛔ 不要去別處找。需要 vault 裡的東西 ⇒ 回報並停下;主迴圈⛔ 不得抄給你,須先落 repo(架構師 2026-09-02 裁決乙)。"
 deny_path() {
-  deny "⛔ vault-guard: 子代理(${agent_type})不得存取 Obsidian Vault —— vault 讀寫權**專屬主迴圈**。工具 ${tool_name} 的 $1 = [$2],$3。${TAILMSG}"
+  deny "⛔ vault-guard: 子代理(${agent_type})不得存取 vault(NamelessRealmsVault)—— vault 讀寫權**專屬主迴圈**。工具 ${tool_name} 的 $1 = [$2],$3。${TAILMSG}"
 }
 
 # ① 字面比對(原有):大小寫不敏感;涵蓋 raw、URL-encoded、以及 ~ 展開前的寫法
-if printf '%s' "$payload" | grep -qiE 'Obsidian[ _]?(Vault|%20Vault)|/Users/quasi-pc/Documents/Obsidian|NamelessRealms[ _]?Vault|/Users/quasi-pc/Documents/NamelessRealms'; then
-  deny "⛔ vault-guard: 子代理(${agent_type})不得存取 Obsidian Vault(/Users/quasi-pc/Documents/NamelessRealmsVault/;舊名 Obsidian Vault/ 同擋)——vault 讀寫權**專屬主迴圈**。工具 ${tool_name} 的參數命中 vault 路徑,已阻擋。${TAILMSG}"
+if printf '%s' "$payload" | grep -qiE 'NamelessRealms[ _]?Vault|/Users/quasi-pc/Documents/NamelessRealms'; then
+  deny "⛔ vault-guard: 子代理(${agent_type})不得存取 vault(/Users/quasi-pc/Documents/NamelessRealmsVault/)——vault 讀寫權**專屬主迴圈**。工具 ${tool_name} 的參數命中 vault 路徑,已阻擋。${TAILMSG}"
 fi
 
 # ② 路徑正規化

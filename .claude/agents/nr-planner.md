@@ -20,7 +20,7 @@ model: claude-fable-5-1
    紀律:**錨點編輯優先**(`Edit` 的 old_string 錨點不匹配即失敗,安全失敗優於整份覆寫);
    需要**整檔搬移**(cp / mv)時你沒有 Bash 做不到 ⇒ 回報主迴圈代搬,⛔ 不得改成自己重打一份。
    (2026-09-02 修訂:原文「整檔搬移優先」與「先 `dryRun` 驗」皆為舊編排遺留 —— 你無 Bash,現行 `Edit` 也無 dryRun 參數。)
-6. ⛔ **不得存取 Obsidian Vault 任何路徑**(由 vault-guard hook 強制)——
+6. ⛔ **不得存取 vault(NamelessRealmsVault)任何路徑**(由 vault-guard hook 強制)——
    vault 讀寫權**專屬主迴圈**(架構師 2026-08-24 拍板,原「收案後更新 vault」職責已收回)。
    需要 vault 裡的東西 ⇒ 回報並停下。⛔ 主迴圈不得抄給你(架構師 2026-09-02 裁決乙):
    裁決須先由你回填 plan-review、規格須先落 repo `docs/`,你再從 repo 讀。
