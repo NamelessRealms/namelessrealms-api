@@ -44,6 +44,8 @@ check_gate() {
     || add "⛔ $name **不是 fail-closed** —— 餵它壞掉的輸入時它選擇放行。這是本編排最不能有的失效方向。"
 }
 
+check_gate "vault-guard.sh"       '{"tool_name":"Read","agent_type":"nr-implementer","tool_input":{"file_path":"/Users/quasi-pc/Documents/NamelessRealmsVault/probe.md"}}'
+# ⚠️ 2026-09-12 改名過渡期:舊根目錄 `Obsidian Vault` 也必須仍被擋(改名前後任一時點都不得有空窗);改名收尾、模板移除舊根後本行一併刪。
 check_gate "vault-guard.sh"       '{"tool_name":"Read","agent_type":"nr-implementer","tool_input":{"file_path":"/Users/quasi-pc/Documents/Obsidian Vault/probe.md"}}'
 check_gate "push-gate.sh"         '{"tool_name":"Bash","tool_input":{"command":"git pu'"sh"' origin main"}}'
 check_gate "audit-write-guard.sh" '{"tool_name":"Bash","tool_input":{"command":"echo x > CLAUDE.md"}}'
@@ -119,7 +121,7 @@ fi
 #    下面第二段斷言就是釘它的——⛔ 不得刪。
 VG="$DIR/vault-guard.sh"
 if [ -x "$VG" ]; then
-  vg_payload() { printf '{"tool_name":"Read"%s,"tool_input":{"file_path":"/Users/quasi-pc/Documents/Obsidian Vault/probe.md"}}' "$1"; }
+  vg_payload() { printf '{"tool_name":"Read"%s,"tool_input":{"file_path":"/Users/quasi-pc/Documents/NamelessRealmsVault/probe.md"}}' "$1"; }
   out=$(vg_payload "" | "$VG" 2>/dev/null)
   printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
     && add "⛔ vault-guard **擋住了主迴圈** —— vault 讀寫權專屬主迴圈,擋掉等於沒人維護得了知識庫。"
